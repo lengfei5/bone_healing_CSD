@@ -18,6 +18,8 @@ library(tidyr)
 library(patchwork)
 library(ggplot2)
 library(pheatmap)
+library(RColorBrewer)
+library("viridis")
 
 version.analysis = '_axolotl_20230308'
 resDir = paste0("../results/scRNAseq_signaling.analysis", version.analysis)
@@ -31,16 +33,26 @@ functionDir = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/
 source('/groups/tanaka/People/current/jiwang/projects/heart_regeneration/scripts/functions_scRNAseq.R')
 source('/groups/tanaka/People/current/jiwang/projects/heart_regeneration/scripts/functions_Visium.R')
 
+annot = readRDS(paste0('/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
 
-library(RColorBrewer)
-library("viridis")
+convert_to_geneSymbol = function(gene.ids, annot)
+{
+  # gene.ids = rownames(mat)
+  mm = match(gene.ids, annot$geneID)
+  ggs = annot$gene.symbol.toUse[mm]
+  
+  kk = which(is.na(ggs))
+  ggs[kk] = gene.ids[kk]
+  return(make.unique(ggs))
+  
+}
+
 cols = rep(NA, length = 8)
 levels = c('CSD_0dpa', 'BL_3_5dpa',  'BL_8dpa', 'BL_11dpa', 
            'CSD_3dpa', 'CSD_5dpa', 'CSD_8dpa', 'CSD_11dpa')
 
 names(cols) = levels
-aa$condition = factor(aa$condition, levels = levels)
-
 
 cols[1] = 'gray60'
 #cols[1:3] = viridis(3)
@@ -163,6 +175,7 @@ aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.
 aa$celltype[which(aa$celltype == 'connective tissue')] = 'CT'
 Idents(aa) = aa$celltype
 
+
 #aa$subtypes = NA
 
 for(celltype in unique(aa$celltype))
@@ -217,6 +230,7 @@ aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.
 
 aa$celltype[which(aa$celltype == 'connective tissue')] = 'CT'
 Idents(aa) = aa$celltype
+aa$condition = factor(aa$condition, levels = levels)
 
 aa$groups = paste0(aa$celltype, '_', aa$condition)
 
@@ -230,22 +244,6 @@ ggsave(filename = paste0(resDir,
                         'selectedCelltypes.pdf'), 
        width = 18, height = 6)
 
-
-
-annot = readRDS(paste0('/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
-                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
-
-convert_to_geneSymbol = function(gene.ids, annot)
-{
-  # gene.ids = rownames(mat)
-  mm = match(gene.ids, annot$geneID)
-  ggs = annot$gene.symbol.toUse[mm]
-  
-  kk = which(is.na(ggs))
-  ggs[kk] = gene.ids[kk]
-  return(make.unique(ggs))
-  
-}
 
 ##########################################
 # test progeny 
@@ -271,6 +269,7 @@ saveRDS(acts, file = paste0(RdataDir, '/res_run_wmean_progeny.rds'))
 
 toc()
 
+acts = readRDS(file = paste0(RdataDir, '/res_run_wmean_progeny.rds'))
 acts
 
 
@@ -321,38 +320,48 @@ dev.off()
 
 ## Exploration 
 # Extract activities from object as a long dataframe
-# Idents(aa) = aa$condition
-# DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE)
-# 
-# df <- t(as.matrix(aa@assays$pathwayswmean@data)) %>%
-#   as.data.frame() %>%
-#   mutate(cluster = Idents(aa)) %>%
-#   pivot_longer(cols = -cluster, names_to = "source", values_to = "score") %>%
-#   group_by(cluster, source) %>%
-#   summarise(mean = mean(score))
-# 
-# # Transform to wide matrix
-# top_acts_mat <- df %>%
-#   pivot_wider(id_cols = 'cluster', names_from = 'source',
-#               values_from = 'mean') %>%
-#   column_to_rownames('cluster') %>%
-#   as.matrix()
-# 
-# # Choose color palette
-# palette_length = 100
-# my_color = colorRampPalette(c("Darkblue", "white","red"))(palette_length)
-# 
-# my_breaks <- c(seq(-2, 0, length.out=ceiling(palette_length/2) + 1),
-#                seq(0.05, 2, length.out=floor(palette_length/2)))
-# 
-# # Plot
-# library(pheatmap)
-# pheatmap::pheatmap(t(top_acts_mat), 
-#                    border_color = NA, 
-#                    cluster_cols = FALSE,
-#                    color=my_color, breaks = my_breaks, 
-#                    filename = paste0(outDir, '/progeny_14_signalingPathways_summary_time.pdf'), 
-#                    width = 6, height = 6) 
+Idents(aa) = aa$groups
+DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE) + NoLegend()
+
+df <- t(as.matrix(aa@assays$pathwayswmean@data)) %>%
+  as.data.frame() %>%
+  mutate(cluster = Idents(aa)) %>%
+  pivot_longer(cols = -cluster, names_to = "source", values_to = "score") %>%
+  group_by(cluster, source) %>%
+  summarise(mean = mean(score))
+
+# Transform to wide matrix
+top_acts_mat <- df %>%
+  pivot_wider(id_cols = 'cluster', names_from = 'source',
+              values_from = 'mean') %>%
+  column_to_rownames('cluster') %>%
+  as.matrix()
+
+vars = names(table(aa$celltype))
+vis = c("BL_11dpa", "BL_8dpa", "BL_3_5dpa", "CSD_0dpa", "CSD_3dpa", "CSD_5dpa", "CSD_8dpa", "CSD_11dpa")
+group_sorted = paste(rep(vars, each = length(vis)), vis, sep = "_")
+
+top_acts_mat = top_acts_mat[match(group_sorted, rownames(top_acts_mat)), ]
+gap_rows = c(8,16,24)
+
+# Choose color palette
+palette_length = 100
+my_color = colorRampPalette(c("Darkblue", "white","red"))(palette_length)
+
+my_breaks <- c(seq(-2, 0, length.out=ceiling(palette_length/2) + 1),
+               seq(0.05, 2, length.out=floor(palette_length/2)))
+
+
+# Plot
+pheatmap::pheatmap((top_acts_mat),
+                   border_color = NA,
+                   cluster_cols = TRUE,
+                   cluster_rows = FALSE,
+                   gaps_row = gap_rows,
+                   color=my_color, 
+                   breaks = my_breaks,
+                   filename = paste0(resDir, '/progeny_14_signalingPathways_summary_celltype_time.pdf'),
+                   width = 6, height = 10)
 
 
 ##########################################
@@ -379,6 +388,7 @@ saveRDS(acts, file = paste0(RdataDir, '/res_run_tfswmean.rds'))
 
 toc()
 
+acts = readRDS(file = paste0(RdataDir, '/res_run_tfswmean.rds'))
 acts
 
 # Extract norm_wmean and store it in tfswmean in pbmc
@@ -478,6 +488,14 @@ top_acts_mat <- df %>%
   column_to_rownames('cluster') %>%
   as.matrix()
 
+vars = names(table(aa$celltype))
+vis = c("BL_11dpa", "BL_8dpa", "BL_3_5dpa", "CSD_0dpa", "CSD_3dpa", "CSD_5dpa", "CSD_8dpa", "CSD_11dpa")
+group_sorted = paste(rep(vars, each = length(vis)), vis, sep = "_")
+
+top_acts_mat = top_acts_mat[match(group_sorted, rownames(top_acts_mat)), ]
+gap_rows = c(8,16,24)
+
+
 # Choose color palette
 palette_length = 100
 my_color = colorRampPalette(c("Darkblue", "white","red"))(palette_length)
@@ -486,10 +504,12 @@ my_breaks <- c(seq(-3, 0, length.out=ceiling(palette_length/2) + 1),
                seq(0.05, 3, length.out=floor(palette_length/2)))
 
 # Plot
-pheatmap::pheatmap(t(top_acts_mat), border_color = NA, color=my_color, breaks = my_breaks,
+pheatmap::pheatmap(top_acts_mat, border_color = NA, color=my_color, breaks = my_breaks,
+                   gaps_row = gap_rows,
                    cluster_cols = TRUE,
+                   cluster_rows = FALSE,
                    filename = paste0(resDir, '/decoupleR_TF.activity_summary_groups.pdf'), 
-                   width = 8, height = 20) 
+                   width = 20, height = 8) 
 
 outDir = paste0(resDir, '/TF_activity_inferred')
 if(!dir.exists(outDir)) dir.create(outDir)
@@ -568,6 +588,10 @@ if(use_ReactomeGSA){
   rm(xx)
   
   # The resulting object is a standard ReactomeAnalysisResult object.
+  gsva_result = readRDS(file = paste0(RdataDir, 
+                                      'BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds_',
+                                      'gsva_result.rds'))
+  
   gsva_result
   
   # pathways returns the pathway-level expression values per cell cluster
@@ -610,6 +634,14 @@ if(use_ReactomeGSA){
   rownames(gsva_mat) = gsva_mat$Name
   gsva_mat = gsva_mat[, -c(1)]
   
+  vars = names(table(aa$celltype))
+  vis = c("BL_11dpa", "BL_8dpa", "BL_3_5dpa", "CSD_0dpa", "CSD_3dpa", "CSD_5dpa", "CSD_8dpa", "CSD_11dpa")
+  group_sorted = paste(rep(vars, each = length(vis)), vis, sep = "_")
+  
+  gsva_mat = gsva_mat[, match(group_sorted, colnames(gsva_mat))]
+  gap_cols = c(8,16,24)
+  
+  
   # Choose color palette
   palette_length = 100
   my_color = colorRampPalette(c("Darkblue", "white","red"))(palette_length)
@@ -618,7 +650,8 @@ if(use_ReactomeGSA){
            #breaks = my_breaks,
            scale = 'row',
            cluster_rows = TRUE,
-           cluster_cols = TRUE,
+           cluster_cols = FALSE,
+           gaps_col = gap_cols,
            fontsize = 7,
            filename = paste0(resDir, '/ReactomeGSA_global_pathwayActivity_', cell_ids, '_many.pdf'), 
            width = 12, height = 35) 
@@ -631,14 +664,18 @@ if(use_ReactomeGSA){
   palette_length = 100
   my_color = colorRampPalette(c("Darkblue", "white","red"))(palette_length)
   
+  gsva_mat = gsva_mat[, match(group_sorted, colnames(gsva_mat))]
+  gap_cols = c(8,16,24)
+  
   pheatmap::pheatmap(gsva_mat, border_color = NA, color=my_color, 
            #breaks = my_breaks,
            scale = 'row',
            cluster_rows = TRUE,
            cluster_cols = FALSE,
-           fontsize = 10,
+           gaps_col = gap_cols,
+           fontsize = 8,
            filename = paste0(resDir, '/ReactomeGSA_global_pathwayActivity_', cell_ids, '_selected.pdf'), 
-           width = 16, height = 14) 
+           width = 12, height = 8) 
   
 }
 
@@ -651,28 +688,32 @@ if(Test_DecoupleR_reactome){
   #reactome = gmt_to_decoupler("c2.cp.reactome.v7.5.1.symbols.gmt")
   msigdb = get_resource("MSigDB")
   
+  resource = 'kegg'
+  outDir = paste0(resDir, '/decoupler_signaling.activity_singleCell_AUCell/')
+  if(!dir.exists(outDir)) dir.create(outDir)
+  
   # Get reactome pathways
-  reactome = msigdb %>% filter(collection == 'reactome_pathways')
+  #reactome = msigdb %>% filter(collection == 'reactome_pathways')
+  #reactome = msigdb %>% filter(collection == 'hallmark')
+  reactome = msigdb %>% filter(collection == 'kegg_pathways')
   
   # Filter duplicates
   reactome = reactome %>% dplyr::select(geneset, genesymbol) %>% 
     distinct()
   
   # Filtering genesets to match behaviour of fgsea
-  geneset_size = table(as.data.frame(reactome)[,1])
+  geneset_size = table(as.data.frame(reactome)[, 1])
   geneset_sel = names(geneset_size)[which((geneset_size > 15) & (geneset_size < 500))]
-  
   #res_gsea <- run_fgsea(mat, network, .source='source', .target='target', nproc=1, minsize = 0)
-  
-  library(tictoc)
   
   # run aucel for each cell
   mat <- as.matrix(aa@assays$RNA@data)
   
   rownames(mat) = convert_to_geneSymbol(rownames(mat), annot = annot)
   mat = mat[grep('^AMEX', rownames(mat), invert = TRUE), ]
-  rownames(mat) = firstup(rownames(mat))
+  #rownames(mat) = firstup(rownames(mat))
   
+  library(tictoc)
   
   tic() # run aucell for each cell
   aucel = run_aucell(mat = mat, network = reactome, 
@@ -680,10 +721,12 @@ if(Test_DecoupleR_reactome){
                      .target="genesymbol",
                      minsize = 5
   )
+  
   saveRDS(aucel, file = paste0(RdataDir, '/res_run_aucel.rds'))
   
   toc()
   
+  aucel = readRDS(file = paste0(RdataDir, '/res_run_aucel.rds'))
   
   
   # Extract norm_wmean and store it in tfswmean in pbmc
@@ -701,8 +744,10 @@ if(Test_DecoupleR_reactome){
   aa <- ScaleData(aa)
   aa@assays$aucell@data <- aa@assays$aucell@scale.data
   
-  Idents(aa) = aa$clusters
+  Idents(aa) = aa$groups
   DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE)
+  
+  # FeaturePlot(aa, features = 'HALLMARK-ALLOGRAFT-REJECTION')
   
   df <- t(as.matrix(aa@assays$aucell@data)) %>%
     as.data.frame() %>%
@@ -712,7 +757,7 @@ if(Test_DecoupleR_reactome){
     summarise(mean = mean(score))
   
   # Get top tfs with more variable means across clusters
-  ntop = 50
+  ntop = 120
   top_SP <- df %>%
     group_by(source) %>%
     summarise(std = sd(mean)) %>%
@@ -730,6 +775,13 @@ if(Test_DecoupleR_reactome){
     column_to_rownames('cluster') %>%
     as.matrix()
   
+  vars = names(table(aa$celltype))
+  vis = c("BL_11dpa", "BL_8dpa", "BL_3_5dpa", "CSD_0dpa", "CSD_3dpa", "CSD_5dpa", "CSD_8dpa", "CSD_11dpa")
+  group_sorted = paste(rep(vars, each = length(vis)), vis, sep = "_")
+  
+  top_aucell_mat = top_aucell_mat[match(group_sorted, rownames(top_aucell_mat)), ]
+  gap_cols = c(8,16,24)
+  
   # Choose color palette
   palette_length = 100
   my_color = colorRampPalette(c("Darkblue", "white","red"))(palette_length)
@@ -738,36 +790,30 @@ if(Test_DecoupleR_reactome){
                  seq(0.05, 3, length.out=floor(palette_length/2)))
   
   # Plot
-  pheatmap(t(top_aucell_mat), border_color = NA, color=my_color, breaks = my_breaks,
-           filename = paste0(outDir, '/decoupleR_REACTOME_summary_clusters.pdf'), 
-           width = 20, height = 20) 
+  pheatmap(t(top_aucell_mat), border_color = NA, 
+           color=my_color, 
+           breaks = my_breaks,
+           cluster_cols = FALSE,
+           gaps_col = gap_cols,
+           filename = paste0(resDir, '/decoupleR_Aucell_', resource, '_summary_clusters.pdf'), 
+           width = 15, height = 24) 
   
-  # Transform to wide matrix
-  top_accell_mat <- df %>%
-    pivot_wider(id_cols = 'cluster', names_from = 'source',
-                values_from = 'mean') %>%
-    column_to_rownames('cluster') %>%
-    as.matrix()
   
-  # Choose color palette
-  palette_length = 100
-  my_color = colorRampPalette(c("Darkblue", "white","red"))(palette_length)
+  for(sp in rownames(aa))
+  {
+    cat('signaling  -- ', sp, '\n')
+    
+    p4 = FeaturePlot(aa, features = sp) + ggtitle(sp)
+    
+    ggsave(filename = paste0(outDir, '/decoupleR_TF_activity_expression_', resource, '_', sp, '.pdf'), 
+           width = 8, height = 6)
+    
+  }
   
-  my_breaks <- c(seq(-2, 0, length.out=ceiling(palette_length/2) + 1),
-                 seq(0.05, 2, length.out=floor(palette_length/2)))
-  
-  # Plot
-  pheatmap(top_acts_mat, border_color = NA, color=my_color, breaks = my_breaks, 
-           filename = paste0(outDir, '/progeny_14_signalingPathways_summary_clusters.pdf'), 
-           width = 10, height = 6) 
-  
-  sp = "REACTOME-SIGNALING-BY-RETINOIC-ACID"
-  sp = "REACTOME-SIGNALING-BY-FGFR" 
-  (FeaturePlot(aa, features = c(sp)) &
-      scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red'))
   
   
 }
+
 
 ########################################################
 ########################################################
