@@ -820,10 +820,26 @@ if(Test_DecoupleR_reactome){
 # test LIANA and NicheNet using clusters 
 ########################################################
 ########################################################
+aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
+
+## manually merge subclusters
+aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_2')] = 'epidermis_BL_early'
+aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_1')] = 'epidermis_BL_early'
+aa$subtypes[which(aa$subtypes == 'CT_BL_early_2')] = 'CT_BL_early_1'
+
+DimPlot(aa, group.by = 'subtypes')
+
+aa$subtypes = factor(aa$subtypes, levels = sort(unique(aa$subtypes)))
+
+aa = ScaleData(aa, features = rownames(aa))
+
+Idents(aa) = aa$subtypes
+
 
 ## test LIANA
 source("functions_ligandReceptor_analysis.R")
-aa$celltypes = aa$clusters
+aa$celltypes = aa$subtypes
+
 
 ## test NicheNet
 source("functions_ligandReceptor_analysis.R")
@@ -996,7 +1012,7 @@ ggsave(filename = paste0(resDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_
        width = 12, height = 6)
 
 # feature plots
-pdfname = paste0(saveDir, "gene_examples_sps_tfs_ligands_receptors.pdf")
+pdfname = paste0(saveDir, "gene_examples_sps_tfs_ligands_receptors_v2.pdf")
 pdf(pdfname, width=16, height = 8)
 par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 
