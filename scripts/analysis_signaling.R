@@ -810,8 +810,6 @@ if(Test_DecoupleR_reactome){
     
   }
   
-  
-  
 }
 
 
@@ -829,7 +827,6 @@ aa$celltypes = aa$clusters
 
 ## test NicheNet
 source("functions_ligandReceptor_analysis.R")
-
 
 ########################################################
 ########################################################
@@ -881,104 +878,172 @@ if(curate.geneList.signalingPathways){
   
 }
 
-saveDir = paste0(outDir, '/geneExamples_pathways/')
+
+saveDir = paste0(resDir, '/geneExamples_pathways/')
 system(paste0('mkdir -p ', saveDir))
 
 DefaultAssay(aa) = 'RNA'
 
-cell_ids  = 'clusters'
+cell_ids  = 'groups'
 
-sps = readRDS(file = paste0('../data/annotations/curated_signaling.pathways_gene.list_v3.rds'))
+## gene example of signaling pathways 
+sps = readRDS(file = paste0("/groups/tanaka/People/current/jiwang/projects/RA_competence/",
+                            '/data/annotations/curated_signaling.pathways_gene.list_v3.rds'))
 sps = unique(sps$gene)
+sps = toupper(sps)
 
-tfs = readRDS(file = paste0('../data/annotations/curated_human_TFs_Lambert.rds'))
+## TFs 
+tfs = readRDS(file = paste0('/groups/tanaka/People/current/jiwang/projects/RA_competence/data',
+                            '/annotations/curated_human_TFs_Lambert.rds'))
 tfs = unique(tfs$`HGNC symbol`)
-tfs = as.character(unlist(sapply(tfs, firstup)))
+#tfs = as.character(unlist(sapply(tfs, firstup)))
 
-#sps = intersect(sps, markers$gene)
+## ligands and receptors from NicheNet
+dataPath_nichenet = '/users/jingkui.wang/projects/heart_regeneration/data/NicheNet/'
+
+ligand_target_matrix = readRDS(paste0(dataPath_nichenet,  "ligand_target_matrix.rds"))
+ligand_target_matrix[1:5,1:5] # target genes in rows, ligands in columns
+
+# ligand-receptor network, Putative ligand-receptor links from NicheNet
+lr_network = readRDS(paste0(dataPath_nichenet, "lr_network.rds"))
+lr_network = lr_network %>% mutate(bonafide = ! database %in% c("ppi_prediction","ppi_prediction_go"))
+lr_network = lr_network %>% dplyr::rename(ligand = from, receptor = to) %>% 
+  distinct(ligand, receptor, bonafide)
+
+head(lr_network)
+
+ligands = lr_network %>% pull(ligand) %>% unique()
+receptors = lr_network %>% pull(receptor) %>% unique()
+
+
+##########################################
+# manual subtyping early BL and CSD clusters
+##########################################
 markers_saved = c()
 
-for(cell_ids in c('condition', 'clusters'))
-{
-  # cell_ids = 'condition'
-  if(cell_ids == 'condition')  {
-    Idents(aa) = aa$condition
-  }else{
-    Idents(aa) = aa$clusters
-  }
-  
-  markers = FindAllMarkers(aa, only.pos = TRUE,  
-                           #min.pct = 0.25, 
-                           logfc.threshold = 0.25)
-  
-  markers_saved = unique(c(markers_saved, markers$gene))
-  markers %>%
-    group_by(cluster) %>%
-    top_n(n = 20, wt = avg_log2FC) -> top10
-  DoHeatmap(aa, features = top10$gene) + NoLegend()
-  
-  ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_top20_by.', cell_ids, '.pdf'), 
-         width = 12, height = 20)
-  
-  DoHeatmap(aa, features = intersect(sps, markers$gene)) + NoLegend()
-  ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_signalingGenes_by.', cell_ids, '.pdf'), 
-         width = 12, height = 25)
-  
-  tfs_sel = intersect(tfs, markers$gene)
-  DoHeatmap(aa, features = tfs_sel) + NoLegend()
-  ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_TFs_by.', cell_ids, '.pdf'), 
-         width = 12, height = 16)
-  
-}
+aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
+aa$subtypes = factor(aa$subtypes, levels = sort(unique(aa$subtypes)))
 
-sps_sels = intersect(sps, markers_saved)
-# feature plots 
-pdfname = paste0(saveDir, "gene_examples_signalingPathways.pdf")
-pdf(pdfname, width=20, height = 6)
+aa = ScaleData(aa, features = rownames(aa))
+Idents(aa) = aa$subtypes
+
+DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
+
+markers = FindAllMarkers(aa, only.pos = TRUE,  
+                         #min.pct = 0.25, 
+                         logfc.threshold = 0.25)
+
+markers_saved = unique(c(markers_saved, markers$gene))
+
+
+## call marker genes
+cell_ids = 'manual_subtyping'
+
+markers %>%
+  group_by(cluster) %>%
+  top_n(n = 20, wt = avg_log2FC) -> top10
+
+DoHeatmap(aa, features = top10$gene) + NoLegend()
+ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_top20_by_', cell_ids, '.pdf'), 
+       width = 12, height = 30)
+
+features = intersect(markers$gene[which(markers$p_val < 10^-100)], sps)
+cat(length(features), ' genes to display \n')
+
+DoHeatmap(aa, features = features) + NoLegend()
+ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_signalingGenes_by_', cell_ids, '.pdf'), 
+       width = 12, height = 40)
+
+tfs_sel = intersect(tfs, markers$gene[which(markers$p_val < 10^-50)])
+
+DoHeatmap(aa, features = tfs_sel) + NoLegend()
+ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_TFs_by_', cell_ids, '.pdf'), 
+       width = 12, height = 30)
+
+
+features = intersect(markers$gene[which(markers$p_val < 10^-100)], receptors)
+cat(length(features), ' genes to display \n')
+
+DoHeatmap(aa, features = features) + NoLegend()
+ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_receptors_by_', cell_ids, '.pdf'), 
+       width = 12, height = 40)
+
+features = intersect(markers$gene[which(markers$p_val < 10^-100)], ligands)
+cat(length(features), ' genes to display \n')
+
+DoHeatmap(aa, features = features) + NoLegend()
+ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_ligands_by_', cell_ids, '.pdf'), 
+       width = 12, height = 40)
+
+
+genes = unique(c(sps, tfs, ligands, receptors))
+genes = genes[!is.na(match(genes, rownames(aa)))]
+genes = intersect(genes, markers$gene[which(markers$p_val < 10^-50)])
+
+aa$condition = droplevels(aa$condition)
+#cols[2:4] = colorRampPalette((brewer.pal(n = 3, name ="Blues")))(3)
+#cols[5:8] = colorRampPalette((brewer.pal(n = 4, name ="OrRd")))(4)
+
+cols_sel = c("#9ECAE1", "#3182BD", 
+             colorRampPalette((brewer.pal(n = 3, name ="OrRd")))(3))
+DimPlot(aa, group.by = 'condition', cols = cols_sel)
+
+p1 = DimPlot(aa, group.by = 'condition', cols = cols_sel, label = TRUE, repel = TRUE)
+p2 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE) + NoLegend()
+p2 + p1
+
+ggsave(filename = paste0(resDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_conditions.pdf'), 
+       width = 12, height = 6)
+
+# feature plots
+pdfname = paste0(saveDir, "gene_examples_sps_tfs_ligands_receptors.pdf")
+pdf(pdfname, width=16, height = 8)
 par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 
 #for(n in 1:20)
-for(n in 1:length(sps_sels))
+for(n in 1:length(genes))
 {
   # n = 1
-  gg = sps_sels[n];
+  gg = genes[n];
   # gg = "Foxa2"
   cat(n, '--', gg, '\n')
-  
+
   p1 = FeaturePlot(aa, features = gg)
-  p2 = VlnPlot(aa, features = gg, group.by = 'condition', pt.size = 0.01)  + NoLegend()  
-    #scale_fill_manual(values=c("blue", 'green', "red",  "blue", 
+  p2 = VlnPlot(aa, features = gg, group.by = 'subtypes', pt.size = 0.01)  + NoLegend()
+    #scale_fill_manual(values=c("blue", 'green', "red",  "blue",
     #                           'red', 'green', 'blue', 'green', 'red', 'green', 'green'))
-  p3 = VlnPlot(aa, features = gg, group.by = 'clusters', pt.size = 0.01) + NoLegend()
-  plot(p1 | p2| p3)
-  
+  #p3 = VlnPlot(aa, features = gg, group.by = 'clusters', pt.size = 0.01) + NoLegend()
+  plot(p1 | p2)
+
 }
 
 dev.off()
 
-tfs = unique(c(tfs, "Zfp703"))
-tfs_sel = intersect(tfs, markers_saved)
 
-pdfname = paste0(saveDir, "gene_examples_TFs.pdf")
-pdf(pdfname, width=24, height = 6)
-par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-
-#for(n in 1:20)
-for(n in 1:length(tfs_sel))
-{
-  # n = 1
-  gg = sps_sels[n];
-  # gg = "Foxa2"
-  cat(n, '--', gg, '\n')
-  
-  p1 = FeaturePlot(aa, features = gg)
-  p2 = VlnPlot(aa, features = gg, group.by = 'condition', pt.size = 0.01)  + NoLegend()  
-  #scale_fill_manual(values=c("blue", 'green', "red",  "blue", 
-  #                           'red', 'green', 'blue', 'green', 'red', 'green', 'green'))
-  p3 = VlnPlot(aa, features = gg, group.by = 'clusters', pt.size = 0.01) + NoLegend()
-  plot(p1 | p2| p3)
-  
-}
-
-dev.off()
-
+# 
+# tfs = unique(c(tfs, "Zfp703"))
+# tfs_sel = intersect(tfs, markers_saved)
+# 
+# pdfname = paste0(saveDir, "gene_examples_TFs.pdf")
+# pdf(pdfname, width=24, height = 6)
+# par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+# 
+# #for(n in 1:20)
+# for(n in 1:length(tfs_sel))
+# {
+#   # n = 1
+#   gg = sps_sels[n];
+#   # gg = "Foxa2"
+#   cat(n, '--', gg, '\n')
+#   
+#   p1 = FeaturePlot(aa, features = gg)
+#   p2 = VlnPlot(aa, features = gg, group.by = 'condition', pt.size = 0.01)  + NoLegend()  
+#   #scale_fill_manual(values=c("blue", 'green', "red",  "blue", 
+#   #                           'red', 'green', 'blue', 'green', 'red', 'green', 'green'))
+#   p3 = VlnPlot(aa, features = gg, group.by = 'clusters', pt.size = 0.01) + NoLegend()
+#   plot(p1 | p2| p3)
+#   
+# }
+# 
+# dev.off()
+# 

@@ -438,6 +438,7 @@ Run_NicheNet_Seurat = function()
   dev.off()
   
   
+  
 }
 
 
