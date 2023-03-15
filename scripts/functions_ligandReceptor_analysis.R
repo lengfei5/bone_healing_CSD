@@ -483,8 +483,8 @@ Run_NicheNet_Seurat = function()
   }
   
 }
-  
-  
+
+
 prioritize_ligands_between_niches = function(seurat_obj, 
                                              niches,
                                              assay_oi = "RNA",
