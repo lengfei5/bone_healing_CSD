@@ -820,6 +820,10 @@ if(Test_DecoupleR_reactome){
 # test LIANA and NicheNet using clusters 
 ########################################################
 ########################################################
+
+##########################################
+# test LIANA 
+##########################################
 aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
 
 ## manually merge subclusters
@@ -835,14 +839,47 @@ aa = ScaleData(aa, features = rownames(aa))
 
 Idents(aa) = aa$subtypes
 
-
 ## test LIANA
 source("functions_ligandReceptor_analysis.R")
 aa$celltypes = aa$subtypes
 
+outDir = paste0(resDir, '/LR_analysis_LIANA_v1') 
+
+
+##########################################
+# Test NicheNet 
+##########################################
+aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
+
+## manually merge subclusters
+aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_2')] = 'epidermis_BL_early'
+aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_1')] = 'epidermis_BL_early'
+aa$subtypes[which(aa$subtypes == 'CT_BL_early_2')] = 'CT_BL_early_1'
+
+## shorten the subtype names
+aa$subtypes[which(aa$subtypes == 'epidermis_BL_early')] = 'epidermis_BL'
+aa$subtypes[which(aa$subtypes == 'epidermis_BL.CSD_early')] = 'epidermis_BL.CSD'
+aa$subtypes[which(aa$subtypes == 'mac_BL_early')] = 'mac_BL'
+aa$subtypes[which(aa$subtypes == 'mac_CSD_early')] = 'mac_CSD'
+aa$subtypes[which(aa$subtypes == 'neu_BL_early')] = 'neu_BL'
+aa$subtypes[which(aa$subtypes == 'neu_CSD_early')] = 'neu_CSD'
+
+aa$subtypes[which(aa$subtypes == 'CT_BL_early_1')] = 'CT_BL'
+aa$subtypes[which(aa$subtypes == 'CT_CSD_early_1')] = 'CT_CSD'
+
+DimPlot(aa, group.by = 'subtypes')
+
+aa$subtypes = factor(aa$subtypes, levels = sort(unique(aa$subtypes)))
+
+aa = ScaleData(aa, features = rownames(aa))
+
+Idents(aa) = aa$subtypes
+
 
 ## test NicheNet
+outDir = paste0(resDir, '/LR_analysis_NicheNet_v1')
 source("functions_ligandReceptor_analysis.R")
+
 
 ########################################################
 ########################################################
