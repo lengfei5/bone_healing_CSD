@@ -28,7 +28,7 @@ RdataDir = paste0(resDir, '/Rdata')
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
-dataDir = '../scRNAseq_dataset/'
+dataDir = '../fromTobie/CSD_batch1/'
 functionDir = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/scripts'
 source('/groups/tanaka/People/current/jiwang/projects/heart_regeneration/scripts/functions_scRNAseq.R')
 source('/groups/tanaka/People/current/jiwang/projects/heart_regeneration/scripts/functions_Visium.R')
@@ -113,6 +113,7 @@ DimPlot(aa, group.by = 'celltype', split.by = 'sample', label = TRUE, repel = TR
 ggsave(filename = paste0(resDir, '/UMAP_merged.BL.CSD_celltypes_split.by.sample.pdf'), width = 18, height = 6)
 
 saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs_umap.rds'))
+
 
 ##########################################
 # subset relevant cell populations:
