@@ -21,14 +21,15 @@ library(pheatmap)
 library(RColorBrewer)
 library("viridis")
 
-version.analysis = '_axolotl_20230308'
+version.analysis = '_axolotl_20240116'
 resDir = paste0("../results/scRNAseq_signaling.analysis", version.analysis)
 RdataDir = paste0(resDir, '/Rdata')
 
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
-dataDir = '../fromTobie/CSD_batch1/'
+dataDir = '../fromTobie/CSD_batch1_batch2/'
+
 functionDir = '/groups/tanaka/People/current/jiwang/projects/heart_regeneration/scripts'
 source('/groups/tanaka/People/current/jiwang/projects/heart_regeneration/scripts/functions_scRNAseq.R')
 source('/groups/tanaka/People/current/jiwang/projects/heart_regeneration/scripts/functions_Visium.R')
@@ -66,20 +67,33 @@ cols[5:8] = colorRampPalette((brewer.pal(n = 4, name ="OrRd")))(4)
 ########################################################
 ########################################################
 aa = readRDS(file = paste0(dataDir, 'BL_SeuratObj.RDS'))
+#xx = readRDS(file = paste0("../fromTobie/CSD_batch1/", 'BL_SeuratObj.RDS'))
+
 bb = readRDS(file = paste0(dataDir, 'CSD_SeuratObj.RDS'))
+
+aa$batch = aa$exp
+bb$batch = bb$exp
 
 p1 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE)
 p2 = DimPlot(bb, group.by = 'celltype', label = TRUE, repel = TRUE)
 
 p1 + p2
 
-ggsave(filename = paste0(resDir, '/Tobie_umap_BL.CSD.pdf'), width = 18, height = 6)
+ggsave(filename = paste0(resDir, '/Tobie_umap.harmony_BL.CSD.split.pdf'), width = 18, height = 6)
 
-aa = merge(aa, bb)
+xx = merge(aa, bb)
 
+DimPlot(xx, group.by = 'type', label = TRUE, repel = TRUE)
+
+aa = xx
 rm(bb)
+rm(xx)
 
 aa$condition = aa$orig.ident
+aa$condition[which(aa$condition == 'BL_3_5dpa')] = 'BL_3and5dpa'
+aa$condition[which(aa$condition == 'CSD_5dpa_A')] = 'CSD_5dpa'
+aa$condition[which(aa$condition == 'CSD_5dpa_B')] = 'CSD_5dpa'
+
 aa$sample = aa$condition
 aa$sample[grep('BL_', aa$sample)] = 'BL'
 aa$sample[grep('CSD_', aa$sample)] = 'CSD'
@@ -88,11 +102,21 @@ aa$days = aa$condition
 aa$days = gsub('BL_', '', aa$days)
 aa$days = gsub('CSD_', '', aa$days)
 
+
+saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_twoBacthes_merged.rds'))
+
+########################################################
+########################################################
+# Section I: batch correction for two batches and BL and CSD
+# 
+########################################################
+########################################################
+aa = readRDS(file = paste0(RdataDir, '/BL.CSD_twoBacthes_merged.rds'))
+
 aa = NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
 aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000) # find subset-specific HVGs
 
-all.genes <- rownames(aa)
-aa <- ScaleData(aa, features = all.genes)
+aa <- ScaleData(aa)
 
 ## because the data was regressed and scaled already, only the HVGs were used to calculate PCA
 aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE, weight.by.var = TRUE)
@@ -100,25 +124,37 @@ ElbowPlot(aa, ndims = 50)
 
 aa <- RunUMAP(aa, dims = 1:50, n.neighbors = 30, min.dist = 0.3)
 
-p1 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE)
-
+p1 = DimPlot(aa, group.by = 'batch', label = TRUE, repel = TRUE)
 p2 = DimPlot(aa, group.by = 'sample', label = TRUE, repel = TRUE)
+p3 = DimPlot(aa, group.by = 'condition', label = TRUE, repel = TRUE)
 
-p1 + p2
+(p1 + p2)/p3 
 
-ggsave(filename = paste0(resDir, '/UMAP_merged.BL.CSD_celltypes_samples.pdf'), width = 18, height = 6)
+ggsave(filename = paste0(resDir, '/UMAP_merged.BL.CSD_batch_samples_condition_no.batchCorrection.pdf'), 
+       width = 18, height = 12)
 
 DimPlot(aa, group.by = 'celltype', split.by = 'sample', label = TRUE, repel = TRUE)
 
-ggsave(filename = paste0(resDir, '/UMAP_merged.BL.CSD_celltypes_split.by.sample.pdf'), width = 18, height = 6)
+p1 = DimPlot(aa, group.by = 'batch', label = TRUE, repel = TRUE)
+p2 = DimPlot(aa, group.by = 'sample', label = TRUE, repel = TRUE)
+p3 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE)
 
-saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs_umap.rds'))
+(p1 + p2)/p3 
+
+ggsave(filename = paste0(resDir, '/UMAP_merged.BL.CSD_batch_samples_celltypes_no.batchCorrection.pdf'), 
+       width = 18, height = 12)
+
+saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs.rds'))
 
 
-##########################################
-# subset relevant cell populations:
+
+
+########################################################
+########################################################
+# Section II: subset relevant cell populations:
 # connective tissue, epidermis, macrophage, neutrophils
-##########################################
+########################################################
+########################################################
 aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs_umap.rds'))
 
 Idents(aa) = aa$celltype
@@ -131,8 +167,8 @@ rm(xx)
 
 aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000) # find subset-specific HVGs
 
-all.genes <- rownames(aa)
-aa <- ScaleData(aa, features = all.genes)
+#all.genes <- rownames(aa)
+aa <- ScaleData(aa)
 
 ## because the data was regressed and scaled already, only the HVGs were used to calculate PCA
 aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE, weight.by.var = TRUE)
