@@ -49,16 +49,17 @@ convert_to_geneSymbol = function(gene.ids, annot)
   
 }
 
-cols = rep(NA, length = 8)
-levels = c('CSD_0dpa', 'BL_3_5dpa',  'BL_8dpa', 'BL_11dpa', 
-           'CSD_3dpa', 'CSD_5dpa', 'CSD_8dpa', 'CSD_11dpa')
+levels = c('CSD_0dpa', 
+           'BL_3and5dpa', 'BL_5dpa', 'BL_6dpa', 'BL_7dpa',  'BL_8dpa', 'BL_11dpa', 
+           'CSD_3dpa', 'CSD_5dpa', 'CSD_6dpa', 'CSD_7dpa', 'CSD_8dpa', 'CSD_11dpa')
 
+cols = rep(NA, length = length(levels))
 names(cols) = levels
 
 cols[1] = 'gray60'
 #cols[1:3] = viridis(3)
-cols[2:4] = colorRampPalette((brewer.pal(n = 3, name ="Blues")))(3)
-cols[5:8] = colorRampPalette((brewer.pal(n = 4, name ="OrRd")))(4)
+cols[2:7] = colorRampPalette((brewer.pal(n = 6, name ="Blues")))(6)
+cols[8:13] = colorRampPalette((brewer.pal(n = 6, name ="OrRd")))(6)
 
 ########################################################
 ########################################################
@@ -146,7 +147,41 @@ ggsave(filename = paste0(resDir, '/UMAP_merged.BL.CSD_batch_samples_celltypes_no
 
 saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs.rds'))
 
+##########################################
+# make batch correction using harmony 
+##########################################
+aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs.rds'))
 
+source('/groups/tanaka/People/current/jiwang/projects/heart_regeneration/scripts/functions_dataIntegration.R')
+
+aa$dataset = paste0(aa$sample, '_', aa$batch)
+
+xx = IntegrateData_runHarmony(aa, group.by = 'dataset', 
+                              nfeatures = 5000, 
+                              dims.use = c(1:50), 
+                              nclust = NULL,
+                              redo.normalization.hvg.scale.pca = FALSE)
+
+p1 = DimPlot(xx, group.by = 'batch', label = TRUE, repel = TRUE)
+p2 = DimPlot(xx, group.by = 'sample', label = TRUE, repel = TRUE)
+p3 = DimPlot(xx, group.by = 'celltype', label = TRUE, repel = TRUE)
+
+(p1 + p2)/p3 
+
+ggsave(filename = paste0(resDir, '/UMAP_merged.BL.CSD_batch_samples_celltypes_Harmony_twoBatch.BL.CSD.pdf'), 
+       width = 18, height = 12)
+
+p1 = DimPlot(xx, group.by = 'batch', label = TRUE, repel = TRUE)
+p2 = DimPlot(xx, group.by = 'sample', label = TRUE, repel = TRUE)
+p3 = DimPlot(xx, group.by = 'condition', label = TRUE, repel = TRUE)
+
+(p1 + p2)/p3 
+
+ggsave(filename = paste0(resDir, '/UMAP_merged.BL.CSD_batch_samples_condition_Harmony_twoBatch.BL.CSD.pdf'), 
+       width = 18, height = 12)
+
+
+saveRDS(xx, file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs_harmony.twoBatches.rds'))
 
 
 ########################################################
@@ -155,11 +190,26 @@ saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs.rds'))
 # connective tissue, epidermis, macrophage, neutrophils
 ########################################################
 ########################################################
-aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs_umap.rds'))
+aa = readRDS( file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs_harmony.twoBatches.rds'))
 
 Idents(aa) = aa$celltype
 
-xx = subset(aa, idents = c('connective tissue', 'epidermis', 'macrophages', 'neutrophils'))
+p1 = DimPlot(aa, group.by = 'batch', label = TRUE, repel = TRUE) 
+p2 = DimPlot(aa, group.by = 'sample', label = TRUE, repel = TRUE)
+p3 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE) + NoLegend()
+
+(p1 + p2)/p3 
+
+# redo clustering 
+aa <- FindNeighbors(aa, reduction = "harmony",
+                    dims = 1:30,  k.param = 20)
+aa <- FindClusters(aa, resolution = 1.0)
+
+p1 = DimPlot(aa, label = TRUE, repel = TRUE)
+p2 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE) + NoLegend()
+p1 + p2
+
+xx = subset(aa, idents = c('Connective Tissue', 'Epidermis', 'Macrophages', 'Neutrophils'))
 DimPlot(xx, group.by = 'celltype',  label = TRUE, repel = TRUE)
 
 aa = xx
@@ -185,39 +235,32 @@ DimPlot(aa, label = TRUE, repel = TRUE)
 
 aa$clusters = aa$seurat_clusters
 
-p1 = DimPlot(aa, group.by = 'celltype',  label = TRUE, repel = TRUE)
-p2 = DimPlot(aa, group.by = 'clusters',  label = TRUE, repel = TRUE)
 
-p1 + p2
+p1 = DimPlot(aa, group.by = 'batch', label = TRUE, repel = TRUE) 
+p2 = DimPlot(aa, group.by = 'sample', label = TRUE, repel = TRUE)
+p3 = DimPlot(aa, group.by = 'celltype',  label = TRUE, repel = TRUE)
+p4 = DimPlot(aa, group.by = 'clusters',  label = TRUE, repel = TRUE)
+
+(p1 + p2)/(p3 + p4)
 
 ggsave(filename = paste0(resDir, 
                          '/UMAP_merged.BL.CSD_subset_celltypes_newClusters.pdf'), 
-       width = 18, height = 6)
+       width = 18, height = 12)
 
-DimPlot(aa, group.by = 'celltype', split.by = 'sample', label = TRUE, repel = TRUE)
 
 saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds'))
-
-# aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds'))
-
-
-DimPlot(aa, group.by = 'condition', cols = cols)
-
 
 ##########################################
 # check the condition and time changes for each cell type 
 ##########################################
 aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds'))
 
-aa$celltype[which(aa$celltype == 'connective tissue')] = 'CT'
+aa$celltype[which(aa$celltype == 'Connective Tissue')] = 'CT'
 Idents(aa) = aa$celltype
-
-
-#aa$subtypes = NA
 
 for(celltype in unique(aa$celltype))
 {
-  # celltype = 'neutrophils'
+  # celltype = 'CT'
   sub.obj = subset(x = aa, idents = celltype)
   
   sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 5000)
@@ -232,18 +275,50 @@ for(celltype in unique(aa$celltype))
                      n.neighbors = n.neighbors,
                      min.dist = min.dist)
   
-  p1 = DimPlot(sub.obj, group.by = 'condition', cols = cols, label = TRUE, repel = TRUE)
-  p2 = DimPlot(sub.obj, group.by = 'Phase', label = TRUE, repel = TRUE)
+  p1 = DimPlot(sub.obj, group.by = 'batch', label = TRUE, repel = TRUE) 
+  p2 = DimPlot(sub.obj, group.by = 'sample', label = TRUE, repel = TRUE)
+  p3 = DimPlot(sub.obj, group.by = 'condition',  label = TRUE, repel = TRUE)
+  p4 = DimPlot(sub.obj, group.by = 'Phase',  label = TRUE, repel = TRUE)
   
-  p1 + p2
+  (p1 + p2)/(p3 + p4)
   
   ggsave(filename = paste0(resDir, 
-                           '/UMAP_merged.BL.CSD_subset_celltypes_checkEachcelltypes.aross.condition.time',
-                           celltype,  '.pdf'), 
-         width = 18, height = 6)
+                           '/UMAP_merged.BL.CSD_subset_celltypes_checkEachcelltypes.aross.condition.time_',
+                           'noBatchIntegration_', celltype,  '.pdf'), 
+         width = 18, height = 12)
   
+  
+  source('/groups/tanaka/People/current/jiwang/projects/heart_regeneration/scripts/functions_dataIntegration.R')
+  
+  xx = IntegrateData_runHarmony(sub.obj, group.by = 'dataset', 
+                                nfeatures = 3000, 
+                                dims.use = c(1:30), 
+                                nclust = NULL,
+                                redo.normalization.hvg.scale.pca = TRUE)
+  
+  xx <- RunUMAP(xx, reduction = "harmony", dims = 1:50, n.neighbors = 50, min.dist = 0.3)
+  
+  p1 = DimPlot(xx, group.by = 'batch', label = TRUE, repel = TRUE) 
+  p2 = DimPlot(xx, group.by = 'sample', label = TRUE, repel = TRUE)
+  p3 = DimPlot(xx, group.by = 'condition',  label = TRUE, repel = TRUE)
+  p4 = DimPlot(xx, group.by = 'Phase',  label = TRUE, repel = TRUE)
+  
+  (p1 + p2)/(p3 + p4)
+  
+  
+  ggsave(filename = paste0(resDir, 
+                           '/UMAP_merged.BL.CSD_subset_celltypes_checkEachcelltypes.aross.condition.time_',
+                           'BatchIntegration_Harmony_', celltype,  '.pdf'), 
+         width = 18, height = 12)
+  
+  
+  yy = readRDS(file = paste0(dataDir, 'BLct_CSDct_Harmony_SeuratObj.RDS'))
+  
+  ggs = convert_to_geneSymbol(rownames(xx), annot = annot)
+  which(ggs == 'PRRX1')
+  FeaturePlot(xx, features = rownames(xx)[ which(ggs == 'HMGB3')])
+ 
 }
-
 
 ########################################################
 ########################################################
