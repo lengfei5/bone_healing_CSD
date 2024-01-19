@@ -554,7 +554,8 @@ markers$geneSymbols = convert_to_geneSymbol(markers$gene, annot = annot)
 saveRDS(markers, file = paste0(RdataDir, '/Epidermis_markers.rds'))
 
 markers = readRDS(file = paste0(RdataDir, '/Epidermis_markers.rds'))
-markers = markers[!is.na(markers$geneSymbols, tfs)]
+markers = markers[!is.na(match(markers$geneSymbols, c(tfs, sps))), ]
+
 
 markers %>%
   group_by(cluster) %>%
@@ -564,6 +565,11 @@ DoHeatmap(aa, features = top10$gene) + NoLegend()
 
 ggsave(filename = paste0(resDir,  'Epidermis_heatmap_markerGenes_top10.pdf'), 
        width = 12, height = 30)
+
+markers = markers[which(markers$cluster == 4), ]
+
+write.csv2(markers, file = paste0(resDir, '/markerGenes_Blastema_specific_Epidermis.csv'), row.names = TRUE)
+
 
 features = intersect(markers$gene[which(markers$p_val < 10^-100)], sps)
 cat(length(features), ' genes to display \n')
@@ -577,6 +583,7 @@ tfs_sel = intersect(tfs, markers$gene[which(markers$p_val < 10^-50)])
 DoHeatmap(aa, features = tfs_sel) + NoLegend()
 ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_TFs_by_', cell_ids, '.pdf'), 
        width = 12, height = 30)
+
 
 
 
