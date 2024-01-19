@@ -45,7 +45,8 @@ convert_to_geneSymbol = function(gene.ids, annot)
   
   kk = which(is.na(ggs))
   ggs[kk] = gene.ids[kk]
-  return(make.unique(ggs))
+  #return(make.unique(ggs))
+  return(ggs)
   
 }
 
@@ -60,6 +61,17 @@ cols[1] = 'gray60'
 #cols[1:3] = viridis(3)
 cols[2:7] = colorRampPalette((brewer.pal(n = 6, name ="Blues")))(6)
 cols[8:13] = colorRampPalette((brewer.pal(n = 6, name ="OrRd")))(6)
+
+## gene example of signaling pathways 
+sps = readRDS(file = paste0("/groups/tanaka/People/current/jiwang/projects/RA_competence/",
+                            '/data/annotations/curated_signaling.pathways_gene.list_v3.rds'))
+sps = unique(sps$gene)
+sps = toupper(sps)
+
+## TFs 
+tfs = readRDS(file = paste0('/groups/tanaka/People/current/jiwang/projects/RA_competence/data',
+                            '/annotations/curated_human_TFs_Lambert.rds'))
+tfs = unique(tfs$`HGNC symbol`)
 
 ########################################################
 ########################################################
@@ -251,6 +263,138 @@ ggsave(filename = paste0(resDir,
 saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds'))
 
 ##########################################
+# double check Tobi's CT filtering  
+##########################################
+Test_Tobi_CT_filtering_steps = FALSE
+if(Test_Tobi_CT_filtering_steps){
+  
+  bb = readRDS(file = paste0(dataDir, 'CSD_SeuratObj.RDS'))
+  
+  DimPlot(bb, group.by = 'seurat_clusters')
+  CSD_int = subset(bb, cells = which(bb$celltype == 'Connective Tissue'))
+  
+  DimPlot(CSD_int, group.by = 'seurat_clusters')
+  
+  CSD_CT = subset(bb, idents = c(5,12,13,17,19))
+  
+  #Cluster cells
+  CSD_CT<- FindNeighbors(CSD_CT, dims = 1:100, reduction = "harmony")
+  CSD_CT <- FindClusters(CSD_CT, resolution = 1)
+  
+  CSD_CT <- RunUMAP(CSD_CT, reduction = "harmony", dims = 1:100, min.dist = 0.1)
+  
+  pdf(paste0(resDir, "/CSD_CT_Harmony_Embedding_PC100_res1.pdf"), 
+      width=10,height=10)
+  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, pt.size = 4, shuffle= T,label = T)
+  DimPlot(object = CSD_CT, reduction = 'umap', raster = T,shuffle= T, pt.size = 4,group.by = "orig.ident")
+  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, shuffle= T, pt.size = 4,group.by = "exp")
+  FeaturePlot(CSD_CT, raster = T,pt.size = 2, features = c("nFeature_RNA","nCount_RNA","percent.mt","mCherry",
+                                                           "eGFP"), order = T, 
+              cols = c("grey",rev(viridis_pal(option = "viridis")(12))))
+  dev.off()
+  
+  #Filter low count cluster
+  VlnPlot(CSD_CT, features = c('nFeature_RNA', 'nCount_RNA', 'percent.mt'))
+
+  CSD_CT = subset(CSD_CT, idents = c(1,8,10), invert = T)
+  
+  #Cluster cells
+  CSD_CT<- FindNeighbors(CSD_CT, dims = 1:100, reduction = "harmony")
+  CSD_CT <- FindClusters(CSD_CT, resolution = 1)
+  
+  CSD_CT <- RunUMAP(CSD_CT, reduction = "harmony", dims = 1:100, min.dist = 0.1)
+  
+  
+  pdf(paste0(resDir, "/CSD_CT_Harmony_Embedding_PC100_res1_filtering_1.pdf"), 
+      width=10,height=10)
+  
+  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, pt.size = 4, shuffle= T,label = T)
+  DimPlot(object = CSD_CT, reduction = 'umap', raster = T,shuffle= T, pt.size = 4, group.by = "orig.ident")
+  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, shuffle= T, pt.size = 4, group.by = "exp")
+  FeaturePlot(CSD_CT, raster = T,pt.size = 2, features = c("nFeature_RNA","nCount_RNA","percent.mt","mCherry","eGFP"),
+              order = T, cols = c("grey",rev(viridis_pal(option = "viridis")(12))))
+  
+  dev.off()
+  
+  #Filter contaminants
+  #cluster 12 = muscle sarcolemma
+  #cluster 14 = macrophage
+  #cluster 11 = high percent.mt
+  #cluster 15 = smooth muscle
+  
+  CSD_CT = subset(CSD_CT, idents = c(11,12,14,15), invert = T)
+  
+  #Cluster cells
+  CSD_CT<- FindNeighbors(CSD_CT, dims = 1:100, reduction = "harmony")
+  CSD_CT <- FindClusters(CSD_CT, resolution = 1)
+  
+  CSD_CT <- RunUMAP(CSD_CT, reduction = "harmony", dims = 1:100, min.dist = 0.1)
+  
+  
+  pdf("CSD_CT_Harmony_Embedding_PC100_res1.pdf",width=10,height=10)
+  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, pt.size = 4, shuffle= T,label = T)
+  DimPlot(object = CSD_CT, reduction = 'umap', raster = T,shuffle= T, pt.size = 4,group.by = "orig.ident")
+  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, shuffle= T, pt.size = 4,group.by = "exp")
+  FeaturePlot(CSD_CT, raster = T,pt.size = 2, features = c("nFeature_RNA","nCount_RNA","percent.mt","mCherry","eGFP"),
+              order = T, cols = c("grey",rev(viridis_pal(option = "viridis")(12))))
+  dev.off()
+  
+  #Filter low count cluster
+  #cluster 1 = low count and blood signal
+  CSD_CT = subset(CSD_CT, idents = c(1,5), invert = T)
+  
+  #Cluster cells
+  CSD_CT<- FindNeighbors(CSD_CT, dims = 1:100, reduction = "harmony")
+  CSD_CT <- FindClusters(CSD_CT, resolution = 1)
+  
+  CSD_CT <- RunUMAP(CSD_CT, reduction = "harmony", dims = 1:100, min.dist = 0.1)
+  
+  CSD_CT@meta.data$time = CSD_CT@meta.data$orig.ident
+  CSD_CT@meta.data$time = gsub("dpa","",CSD_CT@meta.data$time)
+  CSD_CT@meta.data$time = gsub("_A","",CSD_CT@meta.data$time)
+  CSD_CT@meta.data$time = gsub("_B","",CSD_CT@meta.data$time)
+  CSD_CT@meta.data$time = gsub("CSD_","",CSD_CT@meta.data$time)
+  CSD_CT@meta.data$time = as.numeric(CSD_CT@meta.data$time)
+  
+  
+  CSD_CT@meta.data$injury = "CSD"
+  
+  #my_spectral_palette = colorRampPalette(colors = grafify:::graf_palettes$okabe_ito[1:8])
+  
+  pdf("CSD_CT_Harmony_Embedding_PC100_res1.pdf",width=10,height=10)
+  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, pt.size = 4, shuffle= T,label = T, 
+          cols = my_spectral_palette(length(unique(CSD_CT@active.ident))))
+  DimPlot(object = CSD_CT, reduction = 'umap', raster = T,shuffle= T, pt.size = 4,group.by = "orig.ident")
+  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, shuffle= T, pt.size = 4,group.by = "exp")
+  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, shuffle= T, pt.size = 3,group.by = "time",
+          cols = c("grey50",rev(viridis_pal(option = "plasma")(length(unique(CSD_CT@meta.data$time))-1))))
+  FeaturePlot(CSD_CT, raster = T,pt.size = 2, features = c("nFeature_RNA","nCount_RNA","percent.mt","mCherry","eGFP"),
+              order = T, cols = c("grey",rev(viridis_pal(option = "viridis")(12))))
+  dev.off()
+  
+  gene_ids = c("AMEX60DD048840","AMEX60DD023361","AMEX60DD029426","AMEX60DD055540","AMEX60DD029436", 
+               "AMEX60DD037674","AMEX60DD023964","AMEX60DD009987","AMEX60DD030520","AMEX60DD048972",
+               "AMEX60DD002658","AMEX60DD012132","AMEX60DD018450","AMEX60DD020580","AMEX60DD052517",
+               "AMEX60DD053922","AMEX60DD048332","AMEX60DD052070","AMEX60DD031414","AMEX60DD024964",
+               "AMEX60DD045921","AMEX60DD035908","AMEX60DD006619","AMEX60DD013910","AMEX60DD025537")
+  
+  gene_names =c("KLF5","COL7A1","COL2A1","COL6A1","TWIST3","TNMD","ASPN","MEOX1","MGP",
+                "CNMD","OTOS","GREM1","PRRX1","MYH11","ACTA2","TAGLN","COL8A1","C1QB","LGALS3BP",
+                "LECT2","S100P","EPCAM","VWF","PLVAP","ALAS2")
+  
+  gg_Fig <- FeaturePlot(CSD_CT, pt.size = 2,raster = T, features = gene_ids,order = T, slot = "data", repel=T)
+  gg_Fig <- lapply( 1:length(gene_ids), function(x) { gg_Fig[[x]] + labs(title=gene_names[x])  & NoAxes()})
+  #,cols = c("grey",rev(viridis_pal(option = "mako")(12)))
+  
+  
+  pdf("CSD_CT_Harmony_UMAP_feature_CellAtlas_Marker_raw.pdf",width=16,height=10)
+  CombinePlots( gg_Fig )
+  dev.off()
+  
+}
+
+
+##########################################
 # check the condition and time changes for each cell type 
 ##########################################
 aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds'))
@@ -258,671 +402,182 @@ aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.
 aa$celltype[which(aa$celltype == 'Connective Tissue')] = 'CT'
 Idents(aa) = aa$celltype
 
-for(celltype in unique(aa$celltype))
-{
-  # celltype = 'CT'
-  sub.obj = subset(x = aa, idents = celltype)
-  
-  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 5000)
-  sub.obj = ScaleData(sub.obj)
-  sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
-  ElbowPlot(sub.obj, ndims = 30)
-  
-  nb.pcs = 30 # nb of pcs depends on the considered clusters or ids
-  n.neighbors = 30; min.dist = 0.3;
-  sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", 
-                     dims = 1:nb.pcs, 
-                     n.neighbors = n.neighbors,
-                     min.dist = min.dist)
-  
-  p1 = DimPlot(sub.obj, group.by = 'batch', label = TRUE, repel = TRUE) 
-  p2 = DimPlot(sub.obj, group.by = 'sample', label = TRUE, repel = TRUE)
-  p3 = DimPlot(sub.obj, group.by = 'condition',  label = TRUE, repel = TRUE)
-  p4 = DimPlot(sub.obj, group.by = 'Phase',  label = TRUE, repel = TRUE)
-  
-  (p1 + p2)/(p3 + p4)
-  
-  ggsave(filename = paste0(resDir, 
-                           '/UMAP_merged.BL.CSD_subset_celltypes_checkEachcelltypes.aross.condition.time_',
-                           'noBatchIntegration_', celltype,  '.pdf'), 
-         width = 18, height = 12)
-  
-  
-  source('/groups/tanaka/People/current/jiwang/projects/heart_regeneration/scripts/functions_dataIntegration.R')
-  
-  xx = IntegrateData_runHarmony(sub.obj, group.by = 'dataset', 
-                                nfeatures = 3000, 
-                                dims.use = c(1:30), 
-                                nclust = NULL,
-                                redo.normalization.hvg.scale.pca = TRUE)
-  
-  xx <- RunUMAP(xx, reduction = "harmony", dims = 1:50, n.neighbors = 50, min.dist = 0.3)
-  
-  p1 = DimPlot(xx, group.by = 'batch', label = TRUE, repel = TRUE) 
-  p2 = DimPlot(xx, group.by = 'sample', label = TRUE, repel = TRUE)
-  p3 = DimPlot(xx, group.by = 'condition',  label = TRUE, repel = TRUE)
-  p4 = DimPlot(xx, group.by = 'Phase',  label = TRUE, repel = TRUE)
-  
-  (p1 + p2)/(p3 + p4)
-  
-  
-  ggsave(filename = paste0(resDir, 
-                           '/UMAP_merged.BL.CSD_subset_celltypes_checkEachcelltypes.aross.condition.time_',
-                           'BatchIntegration_Harmony_', celltype,  '.pdf'), 
-         width = 18, height = 12)
-  
-  
-  yy = readRDS(file = paste0(dataDir, 'BLct_CSDct_Harmony_SeuratObj.RDS'))
-  
-  ggs = convert_to_geneSymbol(rownames(xx), annot = annot)
-  which(ggs == 'PRRX1')
-  FeaturePlot(xx, features = rownames(xx)[ which(ggs == 'HMGB3')])
- 
-}
+celltype = 'CT'
+sub.obj = subset(x = aa, idents = celltype)
 
-########################################################
-########################################################
-# Section I: test global pathway analysis 
-#  - e.g. decoupleR, Pagoda2 (optional)
-# decoupleR original code from https://saezlab.github.io/decoupleR/articles/pw_sc.html
-# and https://www.sc-best-practices.org/conditions/gsea_pathway.html
-########################################################
-########################################################
-library(Seurat)
-library(decoupleR)
-library(tictoc)
-library(dplyr)
-library(tibble)
-library(tidyr)
-library(patchwork)
-library(ggplot2)
-library(pheatmap)
+sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 5000)
+sub.obj = ScaleData(sub.obj)
+sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
+ElbowPlot(sub.obj, ndims = 30)
 
-aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds'))
+nb.pcs = 30 # nb of pcs depends on the considered clusters or ids
+n.neighbors = 30; min.dist = 0.3;
+sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", 
+                   dims = 1:nb.pcs, 
+                   n.neighbors = n.neighbors,
+                   min.dist = min.dist)
 
-aa$celltype[which(aa$celltype == 'connective tissue')] = 'CT'
-Idents(aa) = aa$celltype
-aa$condition = factor(aa$condition, levels = levels)
+p1 = DimPlot(sub.obj, group.by = 'batch', label = TRUE, repel = TRUE) 
+p2 = DimPlot(sub.obj, group.by = 'sample', label = TRUE, repel = TRUE)
+p3 = DimPlot(sub.obj, group.by = 'condition',  label = TRUE, repel = TRUE)
+p4 = DimPlot(sub.obj, group.by = 'Phase',  label = TRUE, repel = TRUE)
 
-aa$groups = paste0(aa$celltype, '_', aa$condition)
-
-p1 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE)
-p2 = DimPlot(aa, group.by = 'condition', cols = cols, label = TRUE, repel = TRUE)
-
-p1 + p2
+(p1 + p2)/(p3 + p4)
 
 ggsave(filename = paste0(resDir, 
-                         '/UMAP_merged.BL.CSD_subset_celltypes_aross.condition.time',
-                        'selectedCelltypes.pdf'), 
-       width = 18, height = 6)
+                         '/UMAP_merged.BL.CSD_subset_celltypes_checkEachcelltypes.aross.condition.time_',
+                         'noBatchIntegration_', celltype,  '.pdf'), 
+       width = 18, height = 12)
 
 
-##########################################
-# test progeny 
-##########################################
-# PROGENy is a comprehensive resource containing a curated collection of pathways and their target genes, 
-# with weights for each interaction
-net <- get_progeny(organism = 'human', top = 500)
-net
+source('/groups/tanaka/People/current/jiwang/projects/heart_regeneration/scripts/functions_dataIntegration.R')
 
-# Activity inference with Weighted Mean
-# Extract the normalized log-transformed counts
-mat <- as.matrix(aa@assays$RNA@data)
-ss = colSums(mat)
+xx = IntegrateData_runHarmony(sub.obj, group.by = 'dataset', 
+                              nfeatures = 5000, 
+                              dims.use = c(1:30), 
+                              nclust = NULL,
+                              redo.normalization.hvg.scale.pca = TRUE)
 
-rownames(mat) = convert_to_geneSymbol(rownames(mat), annot = annot)
-mat = mat[grep('^AMEX', rownames(mat), invert = TRUE), ]
+xx <- RunUMAP(xx, reduction = "harmony", dims = 1:50, n.neighbors = 50, min.dist = 0.1)
 
-# Run wmean
-tic()
-acts <- run_wmean(mat=mat, net=net, .source='source', .target='target',
-                  .mor='weight', times = 100, minsize = 5)
-saveRDS(acts, file = paste0(RdataDir, '/res_run_wmean_progeny.rds'))
+p1 = DimPlot(xx, group.by = 'batch', label = TRUE, repel = TRUE) 
+p2 = DimPlot(xx, group.by = 'sample', label = TRUE, repel = TRUE)
+p3 = DimPlot(xx, group.by = 'condition',  label = TRUE, repel = TRUE)
+p4 = DimPlot(xx, group.by = 'Phase',  label = TRUE, repel = TRUE)
 
-toc()
-
-acts = readRDS(file = paste0(RdataDir, '/res_run_wmean_progeny.rds'))
-acts
+(p1 + p2)/(p3 + p4)
+ggsave(filename = paste0(resDir, 
+                         '/UMAP_merged.BL.CSD_subset_celltypes_checkEachcelltypes.aross.condition.time_',
+                         'BatchIntegration_Harmony_', celltype,  '.pdf'), 
+       width = 18, height = 12)
 
 
-## Visualization 
-# Extract norm_wmean and store it in pathwayswmean in data
-aa[['pathwayswmean']] <- acts %>%
-  filter(statistic == 'norm_wmean') %>%
-  pivot_wider(id_cols = 'source', names_from = 'condition',
-              values_from = 'score') %>%
-  column_to_rownames('source') %>%
-  Seurat::CreateAssayObject(.)
+xx <- FindNeighbors(xx, dims = 1:50, reduction = "harmony")
+xx <- FindClusters(xx, resolution = 1)
 
-# Change assay
-DefaultAssay(object = aa) <- "pathwayswmean"
+pdf(paste0(resDir, "/",  celltype,  "_Harmony_Embedding.pdf"), 
+    width=10, height=8)
+DimPlot(object = xx, reduction = 'umap',raster = T, pt.size = 4, shuffle= T,label = T)
 
-# Scale the data
-aa <- ScaleData(aa)
-aa@assays$pathwayswmean@data <- aa@assays$pathwayswmean@scale.data
+DimPlot(object = xx, reduction = 'umap', raster = T,shuffle= T, pt.size = 4,group.by = "orig.ident")
+DimPlot(object = xx, reduction = 'umap',raster = T, shuffle= T, pt.size = 4,group.by = "exp")
+DimPlot(object = xx, reduction = 'umap',raster = T, shuffle= T, pt.size = 3,group.by = "time",
+        cols = c("grey50",rev(viridis_pal(option = "plasma")(length(unique(xx@meta.data$time))-1))))
+FeaturePlot(xx, raster = T,pt.size = 2, features = c("nFeature_RNA","nCount_RNA","percent.mt","mCherry","eGFP"),
+            order = T)
 
-p1 <- DimPlot(aa, reduction = "umap", group.by = 'condition', cols = cols, label = TRUE, pt.size = 0.5) + 
-  ggtitle('condition')
-p2 <- (FeaturePlot(aa, features = c("Trail")) & 
-         scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red')) +
-  ggtitle('Trail activity')
-p1 | p2
-
-FeaturePlot(aa, features = rownames(aa)) & 
-  scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red')
-
-ggsave(filename = paste0(resDir, '/progeny_14_signalingPathways.pdf'), 
-       width = 30, height = 18)
-
-pdfname = paste0(resDir, "/progyny_14_signalingPathways_split.by.sample.pdf")
-pdf(pdfname, width=18, height = 6)
-par(cex =1.0, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-
-for(n in 1:nrow(aa))
-{
-  cat(n, '--', rownames(aa)[n], '\n')
-  p1 = FeaturePlot(aa, features = rownames(aa)[n], split.by = 'sample') & 
-    scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red')
-  plot(p1)
-  
-}
+VlnPlot(xx, features = 'nFeature_RNA')
+VlnPlot(xx, features = 'nCount_RNA')
+VlnPlot(xx, features = 'percent.mt')
+VlnPlot(xx, features = 'mCherry')
 
 dev.off()
 
+xx = subset(xx, idents = c(2, 6, 7, 11, 12, 13, 20, 21, 14, 24), invert = T)
 
-## Exploration 
-# Extract activities from object as a long dataframe
-Idents(aa) = aa$groups
-DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE) + NoLegend()
+xx <- RunUMAP(xx, reduction = "harmony", dims = 1:50,  min.dist = 0.1)
 
-df <- t(as.matrix(aa@assays$pathwayswmean@data)) %>%
-  as.data.frame() %>%
-  mutate(cluster = Idents(aa)) %>%
-  pivot_longer(cols = -cluster, names_to = "source", values_to = "score") %>%
-  group_by(cluster, source) %>%
-  summarise(mean = mean(score))
+p1 = DimPlot(xx, group.by = 'batch', label = TRUE, repel = TRUE) 
+p2 = DimPlot(xx, group.by = 'sample', label = TRUE, repel = TRUE)
+p3 = DimPlot(xx, group.by = 'condition',  label = TRUE, repel = TRUE)
+p4 = DimPlot(xx, group.by = 'Phase',  label = TRUE, repel = TRUE)
 
-# Transform to wide matrix
-top_acts_mat <- df %>%
-  pivot_wider(id_cols = 'cluster', names_from = 'source',
-              values_from = 'mean') %>%
-  column_to_rownames('cluster') %>%
-  as.matrix()
+(p1 + p2)/(p3 + p4)
 
-vars = names(table(aa$celltype))
-vis = c("BL_11dpa", "BL_8dpa", "BL_3_5dpa", "CSD_0dpa", "CSD_3dpa", "CSD_5dpa", "CSD_8dpa", "CSD_11dpa")
-group_sorted = paste(rep(vars, each = length(vis)), vis, sep = "_")
-
-top_acts_mat = top_acts_mat[match(group_sorted, rownames(top_acts_mat)), ]
-gap_rows = c(8,16,24)
-
-# Choose color palette
-palette_length = 100
-my_color = colorRampPalette(c("Darkblue", "white","red"))(palette_length)
-
-my_breaks <- c(seq(-2, 0, length.out=ceiling(palette_length/2) + 1),
-               seq(0.05, 2, length.out=floor(palette_length/2)))
+xx <- FindNeighbors(xx, dims = 1:50, reduction = "harmony")
+xx <- FindClusters(xx, resolution = 1)
 
 
-# Plot
-pheatmap::pheatmap((top_acts_mat),
-                   border_color = NA,
-                   cluster_cols = TRUE,
-                   cluster_rows = FALSE,
-                   gaps_row = gap_rows,
-                   color=my_color, 
-                   breaks = my_breaks,
-                   filename = paste0(resDir, '/progeny_14_signalingPathways_summary_celltype_time.pdf'),
-                   width = 6, height = 10)
+pdf(paste0(resDir, "/",  celltype,  "_Harmony_Embedding_filtered.pdf"), 
+    width=10, height=8)
+DimPlot(object = xx, reduction = 'umap',raster = T, pt.size = 4, shuffle= T,label = T)
+
+DimPlot(object = xx, reduction = 'umap', raster = T,shuffle= T, pt.size = 4,group.by = "orig.ident")
+DimPlot(object = xx, reduction = 'umap',raster = T, shuffle= T, pt.size = 4,group.by = "exp")
+DimPlot(object = xx, reduction = 'umap',raster = T, shuffle= T, pt.size = 3,group.by = "time",
+        cols = c("grey50",rev(viridis_pal(option = "plasma")(length(unique(xx@meta.data$time))-1))))
+FeaturePlot(xx, raster = T,pt.size = 2, features = c("nFeature_RNA","nCount_RNA","percent.mt","mCherry","eGFP"),
+            order = T)
+
+VlnPlot(xx, features = 'nFeature_RNA')
+VlnPlot(xx, features = 'nCount_RNA')
+VlnPlot(xx, features = 'percent.mt')
+VlnPlot(xx, features = 'mCherry')
+
+dev.off()
+
+yy = readRDS(file = paste0(dataDir, 'BLct_CSDct_Harmony_SeuratObj.RDS'))
+DimPlot(yy, group.by = 'type')
+
+ggs = convert_to_geneSymbol(rownames(xx), annot = annot)
+which(ggs == 'PRRX1')
+FeaturePlot(xx, features = rownames(xx)[ which(ggs == 'HMGB3')])
+
 
 
 ##########################################
-# test TF activity with decoupleR (original code https://saezlab.github.io/decoupleR/articles/tf_sc.html)  
+# epidermis  
 ##########################################
-library(OmnipathR)
-
-net <- get_dorothea(organism="mouse", levels=c('A', 'B', 'C'))
-net
-
-# Extract the normalized log-transformed counts
-mat <- as.matrix(aa@assays$RNA@data)
-
-rownames(mat) = convert_to_geneSymbol(rownames(mat), annot = annot)
-mat = mat[grep('^AMEX', rownames(mat), invert = TRUE), ]
-rownames(mat) = firstup(rownames(mat))
-
-# Run wmean
-tic()
-acts <- run_wmean(mat=mat, net=net, .source='source', .target='target',
-                  .mor='mor', times = 100, minsize = 5)
-
-saveRDS(acts, file = paste0(RdataDir, '/res_run_tfswmean.rds'))
-
-toc()
-
-acts = readRDS(file = paste0(RdataDir, '/res_run_tfswmean.rds'))
-acts
-
-# Extract norm_wmean and store it in tfswmean in pbmc
-aa[['tfswmean']] <- acts %>%
-  filter(statistic == 'norm_wmean') %>%
-  pivot_wider(id_cols = 'source', names_from = 'condition',
-              values_from = 'score') %>%
-  column_to_rownames('source') %>%
-  Seurat::CreateAssayObject(.)
-
-# Change assay
-DefaultAssay(object = aa) <- "tfswmean"
-
-# Scale the data
-aa <- ScaleData(aa)
-aa@assays$tfswmean@data <- aa@assays$tfswmean@scale.data
+aa = readRDS(paste0(dataDir, 'BLep_CSDep_Harmony_SeuratObj.RDS'))
 
 
-# DimPlot(aa, reduction = "umap", group.by =  "Phase",  label = TRUE, pt.size = 0.5, label.size = 6) + 
-#   ggtitle('time points')
-# ggsave(filename = paste0(outDir,  '/cellcycle_umap.pdf'), 
-#        width = 10, height = 6)
-# 
-# p0 = DimPlot(aa, reduction = "umap", group.by = 'condition',  label = TRUE, pt.size = 0.5, label.size = 6) + 
-#   ggtitle('time points')
-# 
-# p1 <- DimPlot(aa, reduction = "umap", label = TRUE, pt.size = 0.5, label.size = 6) + 
-#   NoLegend() + ggtitle('clusters')
-# p0 | p1
-# 
-# ggsave(filename = paste0(outDir,  '/timePoints_clusters.pdf'), 
-#        width = 12, height = 6)
+p1 = DimPlot(aa, group.by = 'injury')
+p2 = DimPlot(object = aa, reduction = 'umap',raster = T, shuffle= T, pt.size = 3,group.by = "time",
+        cols = c("grey50",rev(viridis_pal(option = "plasma")(length(unique(xx@meta.data$time))-1))))
 
-DefaultAssay(object = aa) <- "tfswmean"
-n_tfs <- 100
-# Extract activities from object as a long dataframe
-Idents(aa) = aa$clusters
+aa <- FindNeighbors(aa, dims = 1:50, reduction = "harmony")
+aa <- FindClusters(aa, resolution = 0.5)
 
-df <- t(as.matrix(aa@assays$tfswmean@data)) %>%
-  as.data.frame() %>%
-  mutate(cluster = Idents(aa)) %>%
-  pivot_longer(cols = -cluster, names_to = "source", values_to = "score") %>%
-  group_by(cluster, source) %>%
-  summarise(mean = mean(score))
+p3 = DimPlot(aa, group.by = 'seurat_clusters', label = TRUE, repel = TRUE)
 
-# Get top tfs with more variable means across clusters
-tfs <- df %>%
-  group_by(source) %>%
-  summarise(std = sd(mean)) %>%
-  arrange(-abs(std)) %>%
-  head(n_tfs) %>%
-  pull(source)
+(p1 + p2)/p3
 
-# Subset long data frame to top tfs and transform to wide matrix
-top_acts_mat <- df %>%
-  filter(source %in% tfs) %>%
-  pivot_wider(id_cols = 'cluster', names_from = 'source',
-              values_from = 'mean') %>%
-  column_to_rownames('cluster') %>%
-  as.matrix()
+ggs = c('AMEX60DD053027', 'AMEX60DD050718', 'AMEX60DD044963',
+          'AMEX60DD014606', 'AMEX60DD018809', 'AMEX60DD018809',
+          'AMEX60DD055164', 'AMEX60DD055164', 'AMEX60DD022398',
+          'AMEX60DD009937')
+FeaturePlot(aa, features = ggs)
 
-# Choose color palette
-palette_length = 100
-my_color = colorRampPalette(c("Darkblue", "white","red"))(palette_length)
-
-my_breaks <- c(seq(-3, 0, length.out=ceiling(palette_length/2) + 1),
-               seq(0.05, 3, length.out=floor(palette_length/2)))
-
-# Plot
-pheatmap::pheatmap(t(top_acts_mat), border_color = NA, color=my_color, breaks = my_breaks,
-         filename = paste0(resDir, '/decoupleR_TF.activity_summary_clusters_top', n_tfs, '.pdf'), 
-         width = 6, height = 16) 
+genes = convert_to_geneSymbol(ggs, annot = annot)
 
 
-Idents(aa) = aa$groups
-
-df <- t(as.matrix(aa@assays$tfswmean@data)) %>%
-  as.data.frame() %>%
-  mutate(cluster = Idents(aa)) %>%
-  pivot_longer(cols = -cluster, names_to = "source", values_to = "score") %>%
-  group_by(cluster, source) %>%
-  summarise(mean = mean(score))
-
-# Get top tfs with more variable means across clusters
-tfs <- df %>%
-  group_by(source) %>%
-  summarise(std = sd(mean)) %>%
-  arrange(-abs(std)) %>%
-  head(n_tfs) %>%
-  pull(source)
-
-# Subset long data frame to top tfs and transform to wide matrix
-top_acts_mat <- df %>%
-  filter(source %in% tfs) %>%
-  pivot_wider(id_cols = 'cluster', names_from = 'source',
-              values_from = 'mean') %>%
-  column_to_rownames('cluster') %>%
-  as.matrix()
-
-vars = names(table(aa$celltype))
-vis = c("BL_11dpa", "BL_8dpa", "BL_3_5dpa", "CSD_0dpa", "CSD_3dpa", "CSD_5dpa", "CSD_8dpa", "CSD_11dpa")
-group_sorted = paste(rep(vars, each = length(vis)), vis, sep = "_")
-
-top_acts_mat = top_acts_mat[match(group_sorted, rownames(top_acts_mat)), ]
-gap_rows = c(8,16,24)
 
 
-# Choose color palette
-palette_length = 100
-my_color = colorRampPalette(c("Darkblue", "white","red"))(palette_length)
+Idents(aa) = aa$seurat_clusters
 
-my_breaks <- c(seq(-3, 0, length.out=ceiling(palette_length/2) + 1),
-               seq(0.05, 3, length.out=floor(palette_length/2)))
+markers = FindAllMarkers(aa, only.pos = TRUE,  
+                         min.pct = 0.1, 
+                         logfc.threshold = 0.25)
 
-# Plot
-pheatmap::pheatmap(top_acts_mat, border_color = NA, color=my_color, breaks = my_breaks,
-                   gaps_row = gap_rows,
-                   cluster_cols = TRUE,
-                   cluster_rows = FALSE,
-                   filename = paste0(resDir, '/decoupleR_TF.activity_summary_groups.pdf'), 
-                   width = 20, height = 8) 
+markers = readRDS(file = paste0(RdataDir, '/Epidermis_markers.rds'))
+markers$geneSymbols = convert_to_geneSymbol(markers$gene, annot = annot)
+saveRDS(markers, file = paste0(RdataDir, '/Epidermis_markers.rds'))
 
-outDir = paste0(resDir, '/TF_activity_inferred')
-if(!dir.exists(outDir)) dir.create(outDir)
+markers = readRDS(file = paste0(RdataDir, '/Epidermis_markers.rds'))
+markers = markers[!is.na(markers$geneSymbols, tfs)]
 
-DefaultAssay(object = aa) <- "RNA" 
-ggs = convert_to_geneSymbol(rownames(aa), annot = annot)
-#for (gene in c('Foxa2', 'Pax6', 'Sox2', 'Sox1'))
-#for(gene in colnames(top_acts_mat))
-DefaultAssay(object = aa) <- "tfswmean"
-tfs = rownames(aa)
+markers %>%
+  group_by(cluster) %>%
+  top_n(n = 10, wt = avg_log2FC) -> top10
 
-for(gene in tfs)
-{
-  cat('gene -- ', gene, '\n')
-  # gene = 'Smad1'
-  DefaultAssay(object = aa) <- "tfswmean"
-  p2 <- (FeaturePlot(aa, features = gene) & 
-           scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red')) + 
-    ggtitle(paste0(gene, ' activity'))
-  DefaultAssay(object = aa) <- "RNA" 
-  
-  feature = rownames(aa)[which(ggs == toupper(gene))]
-  if(length(feature) == 1){
-    p3 <- FeaturePlot(aa, features = feature) + ggtitle(paste0(gene, ' expression'))
-    DefaultAssay(object = aa) <- "tfswmean"
-    p2 | p3
-    
-    ggsave(filename = paste0(outDir, '/decoupleR_TF_activity_expression_', gene, '.pdf'), 
-           width = 12, height = 6)
-  }else{
-    p2 
-    ggsave(filename = paste0(outDir, '/decoupleR_TF_activity_expression_', gene, '.pdf'), 
-           width = 8, height = 6)
-  }
-  
-}
+DoHeatmap(aa, features = top10$gene) + NoLegend()
 
-saveRDS(aa, file = paste0(RdataDir, 
-                      'BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds_',
-                      'savedTFactivities.decoupleR.rds'))
+ggsave(filename = paste0(resDir,  'Epidermis_heatmap_markerGenes_top10.pdf'), 
+       width = 12, height = 30)
 
-##########################################
-# try ReactomeGSA for global pathway analysis 
-# https://bioconductor.org/packages/release/bioc/vignettes/ReactomeGSA/inst/doc/analysing-scRNAseq.html
-# 
-##########################################
-use_ReactomeGSA = FALSE
-if(use_ReactomeGSA){
-  require(ReactomeGSA)
-  require(tictoc)
-  
-  cell_ids  = 'groups'
-  Idents(aa) = aa$groups
-  
-  # if(cell_ids == 'condition')  {
-  #   Idents(aa) = aa$condition
-  # }else{
-  #   Idents(aa) = aa$clusters
-  # }
-  # Extract the normalized log-transformed counts
-  mat <- aa@assays$RNA@data
-  rownames(mat) = convert_to_geneSymbol(rownames(mat), annot = annot)
-  xx = CreateSeuratObject(counts = mat, assay = 'RNA', meta.data = aa@meta.data)
-  rm(mat)
-  
-  Idents(xx) = xx$groups
-  
-  tic()
-  gsva_result <- analyse_sc_clusters(object = xx, verbose = TRUE)
-  
-  toc()
-  
-  saveRDS(gsva_result, file = paste0(RdataDir, 
-                            'BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds_',
-                            'gsva_result.rds'))
-  rm(xx)
-  
-  # The resulting object is a standard ReactomeAnalysisResult object.
-  gsva_result = readRDS(file = paste0(RdataDir, 
-                                      'BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds_',
-                                      'gsva_result.rds'))
-  
-  gsva_result
-  
-  # pathways returns the pathway-level expression values per cell cluster
-  pathway_expression <- pathways(gsva_result)
-  
-  # simplify the column names by removing the default dataset identifier
-  colnames(pathway_expression) <- gsub("\\.Seurat", "", colnames(pathway_expression))
-  pathway_expression[1:3, ]
-  
-  # A simple approach to find the most relevant pathways is to assess the maximum difference 
-  # in expression for every pathway:
-  
-  # find the maximum differently expressed pathway
-  max_difference <- do.call(rbind, apply(pathway_expression, 1, function(row) {
-    values <- as.numeric(row[2:length(row)])
-    return(data.frame(name = row[1], min = min(abs(values)), max = max(abs(values))))
-  }))
-  
-  max_difference$diff <- max_difference$max - max_difference$min
-  
-  # sort based on the difference
-  max_difference <- max_difference[order(max_difference$diff, decreasing = T), ]
-  head(max_difference)
-  
-  plot(max_difference$max, max_difference$diff, cex = 0.5)
-  abline(v = 0.2)
-  abline(h = 0.02)
-  sels = which(max_difference$max>=0.2 & max_difference$diff>0.1)
-  
-  cat(length(sels), ' pathways passing thresholds \n')
-  
-  #relevant_pathways <- c("R-HSA-983170", "R-HSA-388841", "R-HSA-2132295", "R-HSA-983705", "R-HSA-5690714")
-  jj = intersect(grep('FGF|WNT|BMP|TGF|Retinoic Acid|Hippo|EGFR|NOTCH|GLI|SHH|Hh', max_difference$name),
-                 grep('Signaling|signaling|Hippo|GLI|SHH|Hh|ERK', max_difference$name))
-  
-  max_difference_jj = max_difference[unique(c(jj)), ]
-  max_difference = max_difference[unique(c(sels, jj)), ]
-  
-  gsva_mat = pathway_expression[match(max_difference$name, pathway_expression$Name), ]
-  rownames(gsva_mat) = gsva_mat$Name
-  gsva_mat = gsva_mat[, -c(1)]
-  
-  vars = names(table(aa$celltype))
-  vis = c("BL_11dpa", "BL_8dpa", "BL_3_5dpa", "CSD_0dpa", "CSD_3dpa", "CSD_5dpa", "CSD_8dpa", "CSD_11dpa")
-  group_sorted = paste(rep(vars, each = length(vis)), vis, sep = "_")
-  
-  gsva_mat = gsva_mat[, match(group_sorted, colnames(gsva_mat))]
-  gap_cols = c(8,16,24)
-  
-  
-  # Choose color palette
-  palette_length = 100
-  my_color = colorRampPalette(c("Darkblue", "white","red"))(palette_length)
-  
-  pheatmap::pheatmap(gsva_mat, border_color = NA, color=my_color, 
-           #breaks = my_breaks,
-           scale = 'row',
-           cluster_rows = TRUE,
-           cluster_cols = FALSE,
-           gaps_col = gap_cols,
-           fontsize = 7,
-           filename = paste0(resDir, '/ReactomeGSA_global_pathwayActivity_', cell_ids, '_many.pdf'), 
-           width = 12, height = 35) 
-  
-  # selected pathways
-  gsva_mat = pathway_expression[match(max_difference_jj$name, pathway_expression$Name), ]
-  rownames(gsva_mat) = gsva_mat$Name
-  gsva_mat = gsva_mat[, -c(1)]
-  
-  palette_length = 100
-  my_color = colorRampPalette(c("Darkblue", "white","red"))(palette_length)
-  
-  gsva_mat = gsva_mat[, match(group_sorted, colnames(gsva_mat))]
-  gap_cols = c(8,16,24)
-  
-  pheatmap::pheatmap(gsva_mat, border_color = NA, color=my_color, 
-           #breaks = my_breaks,
-           scale = 'row',
-           cluster_rows = TRUE,
-           cluster_cols = FALSE,
-           gaps_col = gap_cols,
-           fontsize = 8,
-           filename = paste0(resDir, '/ReactomeGSA_global_pathwayActivity_', cell_ids, '_selected.pdf'), 
-           width = 12, height = 8) 
-  
-}
+features = intersect(markers$gene[which(markers$p_val < 10^-100)], sps)
+cat(length(features), ' genes to display \n')
 
-##########################################
-# try different method for signaling pathways with decoupleR
-# original code from https://www.sc-best-practices.org/conditions/gsea_pathway.html
-##########################################
-Test_DecoupleR_reactome = FALSE
-if(Test_DecoupleR_reactome){
-  #reactome = gmt_to_decoupler("c2.cp.reactome.v7.5.1.symbols.gmt")
-  msigdb = get_resource("MSigDB")
-  
-  resource = 'kegg'
-  outDir = paste0(resDir, '/decoupler_signaling.activity_singleCell_AUCell/')
-  if(!dir.exists(outDir)) dir.create(outDir)
-  
-  # Get reactome pathways
-  #reactome = msigdb %>% filter(collection == 'reactome_pathways')
-  #reactome = msigdb %>% filter(collection == 'hallmark')
-  reactome = msigdb %>% filter(collection == 'kegg_pathways')
-  
-  # Filter duplicates
-  reactome = reactome %>% dplyr::select(geneset, genesymbol) %>% 
-    distinct()
-  
-  # Filtering genesets to match behaviour of fgsea
-  geneset_size = table(as.data.frame(reactome)[, 1])
-  geneset_sel = names(geneset_size)[which((geneset_size > 15) & (geneset_size < 500))]
-  #res_gsea <- run_fgsea(mat, network, .source='source', .target='target', nproc=1, minsize = 0)
-  
-  # run aucel for each cell
-  mat <- as.matrix(aa@assays$RNA@data)
-  
-  rownames(mat) = convert_to_geneSymbol(rownames(mat), annot = annot)
-  mat = mat[grep('^AMEX', rownames(mat), invert = TRUE), ]
-  #rownames(mat) = firstup(rownames(mat))
-  
-  library(tictoc)
-  
-  tic() # run aucell for each cell
-  aucel = run_aucell(mat = mat, network = reactome, 
-                     .source="geneset",
-                     .target="genesymbol",
-                     minsize = 5
-  )
-  
-  saveRDS(aucel, file = paste0(RdataDir, '/res_run_aucel.rds'))
-  
-  toc()
-  
-  aucel = readRDS(file = paste0(RdataDir, '/res_run_aucel.rds'))
-  
-  
-  # Extract norm_wmean and store it in tfswmean in pbmc
-  aa[['aucell']] <- aucel %>%
-    filter(statistic == 'aucell') %>%
-    pivot_wider(id_cols = 'source', names_from = 'condition',
-                values_from = 'score') %>%
-    column_to_rownames('source') %>%
-    Seurat::CreateAssayObject(.)
-  
-  # Change assay
-  DefaultAssay(object = aa) <- "aucell"
-  
-  # Scale the data
-  aa <- ScaleData(aa)
-  aa@assays$aucell@data <- aa@assays$aucell@scale.data
-  
-  Idents(aa) = aa$groups
-  DimPlot(aa, label = TRUE, repel = TRUE, raster=FALSE)
-  
-  # FeaturePlot(aa, features = 'HALLMARK-ALLOGRAFT-REJECTION')
-  
-  df <- t(as.matrix(aa@assays$aucell@data)) %>%
-    as.data.frame() %>%
-    mutate(cluster = Idents(aa)) %>%
-    pivot_longer(cols = -cluster, names_to = "source", values_to = "score") %>%
-    group_by(cluster, source) %>%
-    summarise(mean = mean(score))
-  
-  # Get top tfs with more variable means across clusters
-  ntop = 120
-  top_SP <- df %>%
-    group_by(source) %>%
-    summarise(std = sd(mean)) %>%
-    arrange(-abs(std)) %>%
-    #summarise(mean_mean = mean(mean)) %>%
-    #arrange(-abs(mean_mean)) %>%
-    head(ntop) %>%
-    pull(source)
-  
-  # Subset long data frame to top tfs and transform to wide matrix
-  top_aucell_mat <- df %>%
-    filter(source %in% top_SP) %>%
-    pivot_wider(id_cols = 'cluster', names_from = 'source',
-                values_from = 'mean') %>%
-    column_to_rownames('cluster') %>%
-    as.matrix()
-  
-  vars = names(table(aa$celltype))
-  vis = c("BL_11dpa", "BL_8dpa", "BL_3_5dpa", "CSD_0dpa", "CSD_3dpa", "CSD_5dpa", "CSD_8dpa", "CSD_11dpa")
-  group_sorted = paste(rep(vars, each = length(vis)), vis, sep = "_")
-  
-  top_aucell_mat = top_aucell_mat[match(group_sorted, rownames(top_aucell_mat)), ]
-  gap_cols = c(8,16,24)
-  
-  # Choose color palette
-  palette_length = 100
-  my_color = colorRampPalette(c("Darkblue", "white","red"))(palette_length)
-  
-  my_breaks <- c(seq(-3, 0, length.out=ceiling(palette_length/2) + 1),
-                 seq(0.05, 3, length.out=floor(palette_length/2)))
-  
-  # Plot
-  pheatmap(t(top_aucell_mat), border_color = NA, 
-           color=my_color, 
-           breaks = my_breaks,
-           cluster_cols = FALSE,
-           gaps_col = gap_cols,
-           filename = paste0(resDir, '/decoupleR_Aucell_', resource, '_summary_clusters.pdf'), 
-           width = 15, height = 24) 
-  
-  
-  for(sp in rownames(aa))
-  {
-    cat('signaling  -- ', sp, '\n')
-    
-    p4 = FeaturePlot(aa, features = sp) + ggtitle(sp)
-    
-    ggsave(filename = paste0(outDir, '/decoupleR_TF_activity_expression_', resource, '_', sp, '.pdf'), 
-           width = 8, height = 6)
-    
-  }
-  
-}
+DoHeatmap(aa, features = features) + NoLegend()
+ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_signalingGenes_by_', cell_ids, '.pdf'), 
+       width = 12, height = 40)
+
+tfs_sel = intersect(tfs, markers$gene[which(markers$p_val < 10^-50)])
+
+DoHeatmap(aa, features = tfs_sel) + NoLegend()
+ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_TFs_by_', cell_ids, '.pdf'), 
+       width = 12, height = 30)
+
 
 
 ########################################################
