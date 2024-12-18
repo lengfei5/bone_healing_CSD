@@ -21,7 +21,7 @@ library(pheatmap)
 library(RColorBrewer)
 library("viridis")
 
-version.analysis = '_axolotl_20240116'
+version.analysis = '_axolotl_20241216'
 resDir = paste0("../results/scRNAseq_signaling.analysis", version.analysis)
 RdataDir = paste0(resDir, '/Rdata')
 
@@ -594,18 +594,19 @@ ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_TFs_by_', cell_ids, '.pd
 # test LIANA and NicheNet using clusters 
 ########################################################
 ########################################################
+dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20230308/Rdata/'
 
 ##########################################
 # test LIANA 
 ##########################################
-aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
+aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
 
 ## manually merge subclusters
 aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_2')] = 'epidermis_BL_early'
 aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_1')] = 'epidermis_BL_early'
 aa$subtypes[which(aa$subtypes == 'CT_BL_early_2')] = 'CT_BL_early_1'
 
-DimPlot(aa, group.by = 'subtypes')
+DimPlot(aa, group.by = 'subtypes', label = TRUE, )
 
 aa$subtypes = factor(aa$subtypes, levels = sort(unique(aa$subtypes)))
 
