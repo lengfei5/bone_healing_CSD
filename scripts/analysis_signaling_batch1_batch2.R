@@ -586,7 +586,6 @@ ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_TFs_by_', cell_ids, '.pd
 
 
 
-
 ########################################################
 ########################################################
 # Section II : ligand-receptor anlaysis
@@ -597,7 +596,7 @@ ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_TFs_by_', cell_ids, '.pd
 dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20230308/Rdata/'
 
 ##########################################
-# test LIANA 
+# test LIANA for all pairs
 ##########################################
 aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
 
@@ -606,7 +605,10 @@ aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_2')] = 'epidermis_BL_early'
 aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_1')] = 'epidermis_BL_early'
 aa$subtypes[which(aa$subtypes == 'CT_BL_early_2')] = 'CT_BL_early_1'
 
-DimPlot(aa, group.by = 'subtypes', label = TRUE, )
+DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
+ggsave(filename = paste0(resDir,  '/UMAP_subtypes.pdf'), 
+       width = 12, height = 8)
+
 
 aa$subtypes = factor(aa$subtypes, levels = sort(unique(aa$subtypes)))
 
@@ -614,11 +616,165 @@ aa = ScaleData(aa, features = rownames(aa))
 
 Idents(aa) = aa$subtypes
 
-## test LIANA
+
+## run LIANA
 source("functions_ligandReceptor_analysis.R")
 aa$celltypes = aa$subtypes
 
-outDir = paste0(resDir, '/LR_analysis_LIANA_v1') 
+#source(paste0(functionDir, "/functions_cccInference.R"))
+#aa$celltypes = aa$subtypes
+outDir = paste0(resDir, '/LR_analysis_LIANA')
+
+liana_test = run_LIANA_defined_celltype(subref = aa, 
+                           celltypes = unique(aa$celltypes),
+                           additionalLabel = '_fixedCelltypes')
+
+#liana_test <- liana_test %>%
+#  liana_aggregate(resource = 'Consensus')
+
+liana_test = readRDS(file = paste0(outDir, '/res_lianaTest_Consensus', 
+                                   additionalLabel, '.rds'))
+
+liana_test <- liana_test %>%
+  liana_aggregate(resource = 'Consensus')
+
+celltypes = unique(aa$celltypes)
+additionalLabel = '_fixedCelltypes'
+receivers = celltypes
+
+df_test = liana_test %>% filter(target %in% receivers & source %in% celltypes) %>% as.data.frame() 
+
+write.table(df_test, file = paste0(outDir, '/res_lianaTest_Consensus', additionalLabel, '.txt'), 
+            sep = '\t', quote = FALSE)
+
+saveRDS(liana_test, file = paste0(outDir, '/res_lianaTest_Consensus', 
+                                  additionalLabel, '_saved.rds'))
+
+## prepare the LIANA output for circoplot
+
+res = df_test
+res = res[, c(1:5, which(colnames(res) == 'natmi.edge_specificity'), 
+                which(colnames(res) == 'sca.LRscore'))]
+colnames(res)[1:4] = c('sender', 'receiver', 'ligand', 'receptor')
+
+
+#require(cellcall)
+library(SeuratData)
+library(Connectome)
+library(cowplot)
+
+res = res[order(-res$sca.LRscore), ]
+
+#which(res$ligand == 'GAS6' & res$receptor == 'AXL')
+#res[which(res$ligand == 'GAS6' & res$receptor == 'AXL'), ]
+
+colnames(res)[1:2] = c('source', 'target')
+res$weight_norm = res$sca.LRscore
+res$pair = paste0(res$ligand, ' - ', res$receptor)
+res$vector = paste0(res$source, ' - ', res$target)
+res$edge = paste0(res$source, ' - ', res$ligand, ' - ', res$receptor, ' - ', res$target)
+res$source.ligand = paste0(res$source, ' - ', res$ligand)
+res$receptor.target = paste0(res$receptor, ' - ', res$target)
+
+write.table(res, 
+            file = paste0(outDir, '/LR_interactions_allPairs_LIANA.txt'), 
+            quote = FALSE, row.names = TRUE, col.names = TRUE, sep = '\t')
+
+saveRDS(res, file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
+
+## plot circosplot
+source(paste0(functionDir, '/functions_cccInference.R'))
+
+
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL.pdf')
+pdf(pdfname, width=12, height = 8)
+
+sender_cells = celltypes[grep('BL', celltypes)]
+receiver_cells = sender_cells[grep('CT', sender_cells)]
+
+print(as.character(sender_cells))
+print(as.character(receiver_cells))
+
+head(grep('WNT', res$ligand))
+
+res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
+
+
+res = res[!is.na(match(res$source, sender_cells)) & !is.na(match(res$target, receiver_cells)), ]
+
+res = res[order(res$aggregate_rank), ]
+
+head(grep('WNT', res$ligand))
+
+for(ntop in c(100, 200, 300))
+{
+  # ntop = 300
+  test = res[c(1:ntop), ]
+  #test = test[-which(test$ligand == 'SPON1'), ] ## for unknow reason this ligand making problem for plots
+  
+  cells.of.interest = unique(c(test$source, test$target))
+  cell_color = randomcoloR::distinctColorPalette(length(cells.of.interest))
+  names(cell_color) <- cells.of.interest
+  
+  my_CircosPlot(test, 
+                weight.attribute = 'weight_norm',
+                cols.use = cell_color,
+                sources.include = cells.of.interest,
+                targets.include = cells.of.interest,
+                lab.cex = 0.5,
+                title = paste('LR scores top :', ntop))
+  
+}
+
+dev.off()
+
+
+
+
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD.pdf')
+pdf(pdfname, width=12, height = 8)
+
+sender_cells = celltypes[grep('CSD', celltypes)]
+receiver_cells = sender_cells[grep('CT', sender_cells)]
+
+print(as.character(sender_cells))
+print(as.character(receiver_cells))
+
+
+
+res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
+
+
+res = res[!is.na(match(res$source, sender_cells)) & !is.na(match(res$target, receiver_cells)), ]
+
+res = res[order(res$aggregate_rank), ]
+head(grep('WNT', res$ligand))
+
+
+for(ntop in c(100, 200, 300))
+{
+  # ntop = 300
+  test = res[c(1:ntop), ]
+  #test = test[-which(test$ligand == 'SPON1'), ] ## for unknow reason this ligand making problem for plots
+  
+  cells.of.interest = unique(c(test$source, test$target))
+  cell_color = randomcoloR::distinctColorPalette(length(cells.of.interest))
+  names(cell_color) <- cells.of.interest
+  
+  my_CircosPlot(test, 
+                weight.attribute = 'weight_norm',
+                cols.use = cell_color,
+                sources.include = cells.of.interest,
+                targets.include = cells.of.interest,
+                lab.cex = 0.5,
+                title = paste('LR scores top :', ntop))
+  
+}
+
+dev.off()
+
+
+
 
 
 ##########################################
@@ -846,32 +1002,3 @@ for(n in 1:length(genes))
 }
 
 dev.off()
-
-
-# 
-# tfs = unique(c(tfs, "Zfp703"))
-# tfs_sel = intersect(tfs, markers_saved)
-# 
-# pdfname = paste0(saveDir, "gene_examples_TFs.pdf")
-# pdf(pdfname, width=24, height = 6)
-# par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-# 
-# #for(n in 1:20)
-# for(n in 1:length(tfs_sel))
-# {
-#   # n = 1
-#   gg = sps_sels[n];
-#   # gg = "Foxa2"
-#   cat(n, '--', gg, '\n')
-#   
-#   p1 = FeaturePlot(aa, features = gg)
-#   p2 = VlnPlot(aa, features = gg, group.by = 'condition', pt.size = 0.01)  + NoLegend()  
-#   #scale_fill_manual(values=c("blue", 'green', "red",  "blue", 
-#   #                           'red', 'green', 'blue', 'green', 'red', 'green', 'green'))
-#   p3 = VlnPlot(aa, features = gg, group.by = 'clusters', pt.size = 0.01) + NoLegend()
-#   plot(p1 | p2| p3)
-#   
-# }
-# 
-# dev.off()
-# 

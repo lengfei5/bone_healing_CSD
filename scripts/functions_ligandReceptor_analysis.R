@@ -12,7 +12,7 @@ run_LIANA_defined_celltype = function(subref,
   
   system(paste0('mkdir -p ', outDir))
   # source('functions_scRNAseq.R') 
- 
+  
   sce <- as.SingleCellExperiment(subref)
   colLabels(sce) = as.factor(sce$celltypes)
   rownames(sce) = toupper(rownames(sce))
@@ -54,115 +54,92 @@ run_LIANA_defined_celltype = function(subref,
   saveRDS(liana_test, file = paste0(outDir, '/res_lianaTest_Consensus', 
                                     additionalLabel, '.rds'))
   
-  liana_test = readRDS(file = paste0(outDir, '/res_lianaTest_Consensus', 
-                                     additionalLabel, '.rds'))
-  
-  liana_test <- liana_test %>%
-    liana_aggregate(resource = 'Consensus')
+  return(liana_test)
   
   
-  if(is.na(receiver_cells)){ # loop over all cell type candidates
-    celltypes = as.character(celltypes)
-    receiver_cells = as.character(celltypes)
-  }
-  
-  ntop = 200
-  manually_specifying_sender_receiver = FALSE
-  if(manually_specifying_sender_receiver){
+  Test = FALSE
+  if(Test){
+    #if(is.na(receiver_cells)){ # loop over all cell type candidates
+    #  celltypes = as.character(celltypes)
+    #  receiver_cells = as.character(celltypes)
+    #}
     
-    sender_cells = c("CT_BL_early_1", "mac_BL_early",  "epidermis_BL_early",  "neu_BL_early")
-    receiver_cells = sender_cells
-    
-    for(ntop in c(100, 200, 500)){
+    ntop = 200
+    manually_specifying_sender_receiver = FALSE
+    if(manually_specifying_sender_receiver){
       
-      # ntop = 100
-      liana_test %>%
-        liana_dotplot(source_groups = sender_cells,
-                      target_groups = receiver_cells,
-                      ntop = ntop)
-      ggsave(filename = paste0(outDir, '/liana_LR_prediction_BL_early', 
-                               additionalLabel, 
-                               #'_receiverCells.', receiver_cells[m], 
-                               '_ntop.', ntop, '.pdf'), 
-             width = 3*length(sender_cells)*length(receiver_cells), 
-             height = 0.25*ntop, limitsize = FALSE)
+      
+      
+      for(ntop in c(100, 200, 500)){
+        
+        # ntop = 100
+        liana_test %>%
+          liana_dotplot(source_groups = sender_cells,
+                        target_groups = receiver_cells,
+                        ntop = ntop)
+        ggsave(filename = paste0(outDir, '/liana_LR_prediction_BL_early', 
+                                 additionalLabel, 
+                                 #'_receiverCells.', receiver_cells[m], 
+                                 '_ntop.', ntop, '.pdf'), 
+               width = 3*length(sender_cells)*length(receiver_cells), 
+               height = 0.25*ntop, limitsize = FALSE)
+        
+      }
+      
+      pdfname = paste0(outDir, '/liana_BL_celltype_communication_freqHeatmap', 
+                       additionalLabel, '.pdf')
+      pdf(pdfname, width=20, height = 8)
+      
+      liana_trunc <- liana_test %>% 
+        filter(source %in% sender_cells) %>%
+        filter(target %in% receiver_cells) %>%
+        # only keep interactions concordant between methods
+        filter(aggregate_rank <= 0.01) # this can be FDR-corr if n is too high
+      
+      heat_freq(liana_trunc)
+      
+      dev.off()
+      
+      sender_cells = c("CT_CSD_early_1", "mac_CSD_early",  "epidermis_BL.CSD_early",  "neu_CSD_early")
+      receiver_cells = sender_cells
+      
+      for(ntop in c(100, 200, 500)){
+        
+        # ntop = 100
+        liana_test %>%
+          liana_dotplot(source_groups = sender_cells,
+                        target_groups = receiver_cells,
+                        ntop = ntop)
+        ggsave(filename = paste0(outDir, '/liana_LR_prediction_CSD_early', 
+                                 additionalLabel, 
+                                 #'_receiverCells.', receiver_cells[m], 
+                                 '_ntop.', ntop, '.pdf'), 
+               width = 3*length(sender_cells)*length(receiver_cells), 
+               height = 0.25*ntop, limitsize = FALSE)
+        
+      }
+      
+      pdfname = paste0(outDir, '/liana_CSDcelltype_communication_freqHeatmap', 
+                       additionalLabel, '.pdf')
+      pdf(pdfname, width=20, height = 8)
+      
+      liana_trunc <- liana_test %>% 
+        filter(source %in% sender_cells) %>%
+        filter(target %in% receiver_cells) %>%
+        # only keep interactions concordant between methods
+        filter(aggregate_rank <= 0.01) # this can be FDR-corr if n is too high
+      
+      heat_freq(liana_trunc)
+      
+      dev.off()
+      
       
     }
     
-    pdfname = paste0(outDir, '/liana_BL_celltype_communication_freqHeatmap', 
-                     additionalLabel, '.pdf')
-    pdf(pdfname, width=20, height = 8)
-    
-    liana_trunc <- liana_test %>% 
-      filter(source %in% sender_cells) %>%
-      filter(target %in% receiver_cells) %>%
-      # only keep interactions concordant between methods
-      filter(aggregate_rank <= 0.01) # this can be FDR-corr if n is too high
-    
-    heat_freq(liana_trunc)
-    
-    dev.off()
-    
-    sender_cells = c("CT_CSD_early_1", "mac_CSD_early",  "epidermis_BL.CSD_early",  "neu_CSD_early")
-    receiver_cells = sender_cells
-    
-    for(ntop in c(100, 200, 500)){
-      
-      # ntop = 100
-      liana_test %>%
-        liana_dotplot(source_groups = sender_cells,
-                      target_groups = receiver_cells,
-                      ntop = ntop)
-      ggsave(filename = paste0(outDir, '/liana_LR_prediction_CSD_early', 
-                               additionalLabel, 
-                               #'_receiverCells.', receiver_cells[m], 
-                               '_ntop.', ntop, '.pdf'), 
-             width = 3*length(sender_cells)*length(receiver_cells), 
-             height = 0.25*ntop, limitsize = FALSE)
-      
-    }
-    
-    pdfname = paste0(outDir, '/liana_CSDcelltype_communication_freqHeatmap', 
-                     additionalLabel, '.pdf')
-    pdf(pdfname, width=20, height = 8)
-    
-    liana_trunc <- liana_test %>% 
-      filter(source %in% sender_cells) %>%
-      filter(target %in% receiver_cells) %>%
-      # only keep interactions concordant between methods
-      filter(aggregate_rank <= 0.01) # this can be FDR-corr if n is too high
-    
-    heat_freq(liana_trunc)
-    
-    dev.off()
-    
-     
   }
-  
-  # for(m in 1:length(receiver_cells))
-  # {
-  #   # m = 1
-  #   cat(m, '-- receiver cells : ', receiver_cells[m], '\n')
-  #   #liana_test %>%
-  #   #  liana_dotplot(source_groups = celltypes[n],
-  #   #                target_groups = celltypes,
-  #   #                ntop = ntop)
-  #   liana_test %>%
-  #     liana_dotplot(source_groups = celltypes,
-  #                   target_groups = receiver_cells[m],
-  #                   ntop = ntop)
-  #   #liana_test_save =  liana_test %>% filter()
-  #   #  liana_dotplot(source_groups = celltypes,
-  #   #                target_groups = receiver_cells[m],
-  #   #                ntop = ntop)
-  #   
-  #   ggsave(filename = paste0(outDir, '/liana_LR_prediction_recieveCell', 
-  #                            additionalLabel, 
-  #                            '_receiverCells.', receiver_cells[m], 
-  #                            '_ntop.', ntop, '.pdf'), 
-  #          width = 30, height = 0.25*ntop, limitsize = FALSE)
-  # }
     
+  
+  
 }
 
 ########################################################
