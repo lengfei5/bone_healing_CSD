@@ -170,7 +170,7 @@ aa$dataset = paste0(aa$sample, '_', aa$batch)
 
 xx = IntegrateData_runHarmony(aa, group.by = 'dataset', 
                               nfeatures = 5000, 
-                              dims.use = c(1:50), 
+                              dims.use = c(1:50),
                               nclust = NULL,
                               redo.normalization.hvg.scale.pca = FALSE)
 
@@ -180,7 +180,8 @@ p3 = DimPlot(xx, group.by = 'celltype', label = TRUE, repel = TRUE)
 
 (p1 + p2)/p3 
 
-ggsave(filename = paste0(resDir, '/UMAP_merged.BL.CSD_batch_samples_celltypes_Harmony_twoBatch.BL.CSD.pdf'), 
+ggsave(filename = paste0(resDir,
+                         '/UMAP_merged.BL.CSD_batch_samples_celltypes_Harmony_twoBatch.BL.CSD.pdf'), 
        width = 18, height = 12)
 
 p1 = DimPlot(xx, group.by = 'batch', label = TRUE, repel = TRUE)
@@ -189,7 +190,8 @@ p3 = DimPlot(xx, group.by = 'condition', label = TRUE, repel = TRUE)
 
 (p1 + p2)/p3 
 
-ggsave(filename = paste0(resDir, '/UMAP_merged.BL.CSD_batch_samples_condition_Harmony_twoBatch.BL.CSD.pdf'), 
+ggsave(filename = paste0(resDir, 
+                         '/UMAP_merged.BL.CSD_batch_samples_condition_Harmony_twoBatch.BL.CSD.pdf'), 
        width = 18, height = 12)
 
 
@@ -606,6 +608,8 @@ aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_1')] = 'epidermis_BL_early'
 aa$subtypes[which(aa$subtypes == 'CT_BL_early_2')] = 'CT_BL_early_1'
 
 DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
+
+
 ggsave(filename = paste0(resDir,  '/UMAP_subtypes.pdf'), 
        width = 12, height = 8)
 
@@ -618,12 +622,13 @@ Idents(aa) = aa$subtypes
 
 
 ## run LIANA
+outDir = paste0(resDir, '/LR_analysis_LIANA')
 source("functions_ligandReceptor_analysis.R")
 aa$celltypes = aa$subtypes
 
+
 #source(paste0(functionDir, "/functions_cccInference.R"))
 #aa$celltypes = aa$subtypes
-outDir = paste0(resDir, '/LR_analysis_LIANA')
 
 liana_test = run_LIANA_defined_celltype(subref = aa, 
                            celltypes = unique(aa$celltypes),
@@ -650,8 +655,8 @@ write.table(df_test, file = paste0(outDir, '/res_lianaTest_Consensus', additiona
 saveRDS(liana_test, file = paste0(outDir, '/res_lianaTest_Consensus', 
                                   additionalLabel, '_saved.rds'))
 
-## prepare the LIANA output for circoplot
 
+## prepare the LIANA output for circoplot
 res = df_test
 res = res[, c(1:5, which(colnames(res) == 'natmi.edge_specificity'), 
                 which(colnames(res) == 'sca.LRscore'))]
@@ -682,7 +687,11 @@ write.table(res,
 
 saveRDS(res, file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
 
+
+
 ## plot circosplot
+res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
+
 source(paste0(functionDir, '/functions_cccInference.R'))
 
 
