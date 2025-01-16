@@ -690,12 +690,15 @@ saveRDS(res, file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
 
 
 ## plot circosplot
-res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
-
+#res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
 source(paste0(functionDir, '/functions_cccInference.R'))
 
+celltypes = unique(aa$celltypes)
+additionalLabel = '_fixedCelltypes'
+receivers = celltypes
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL.pdf')
+
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_v2.pdf')
 pdf(pdfname, width=12, height = 8)
 
 sender_cells = celltypes[grep('BL', celltypes)]
@@ -708,12 +711,76 @@ head(grep('WNT', res$ligand))
 
 res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
 
-
 res = res[!is.na(match(res$source, sender_cells)) & !is.na(match(res$target, receiver_cells)), ]
 
 res = res[order(res$aggregate_rank), ]
 
 head(grep('WNT', res$ligand))
+
+#cell_color = randomcoloR::distinctColorPalette(length(cells.of.interest))
+
+cells.of.interest = unique(c(res$source, res$target))
+cell_color = c("#2AD0B7", "#98B304", "#16005e", "#005e45", "#2f7c67", "#3200F5")
+names(cell_color) <- c("mac_BL_early", "neu_BL_early", "epidermis_BL_early",
+                       "CT_BL_early_1", "CT_BL_early_3", "epidermis_BL.CSD_early")
+
+
+# Mac_BL_early #2AD0B7
+# Neu_BL_early #98B304
+# Epidermis_BL_early #16005e
+# CT_BL_early_1 #005e45
+# CT_BL_early_3 #2f7c67
+# Epidermis_BL.CSD_early #3200F5
+
+
+for(ntop in c(100, 200, 300))
+{
+  # ntop = 300
+  test = res[c(1:ntop), ]
+  
+  ## for unknow reason this ligand making problem for plots
+  #test = test[-which(test$ligand == 'SPON1'), ] 
+  
+  my_CircosPlot(test, 
+                weight.attribute = 'weight_norm',
+                cols.use = cell_color,
+                sources.include = cells.of.interest,
+                targets.include = cells.of.interest,
+                lab.cex = 0.4,
+                title = paste('LR scores top :', ntop))
+  
+}
+
+dev.off()
+
+
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_v2.pdf')
+pdf(pdfname, width=12, height = 8)
+
+sender_cells = celltypes[grep('CSD', celltypes)]
+receiver_cells = sender_cells[grep('CT', sender_cells)]
+
+print(as.character(sender_cells))
+print(as.character(receiver_cells))
+
+res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
+
+res = res[!is.na(match(res$source, sender_cells)) & !is.na(match(res$target, receiver_cells)), ]
+
+res = res[order(res$aggregate_rank), ]
+head(grep('WNT', res$ligand))
+
+cells.of.interest = unique(c(res$source, res$target))
+cell_color = c("#2AD0B7", "#98B304", "#d693b8", "#925677", "#61394f", "#3200F5")
+names(cell_color) <- c("mac_CSD_early", "neu_CSD_early", "CT_CSD_early_1",
+                       "CT_CSD_early_2", "CT_CSD_early_3", "epidermis_BL.CSD_early")
+
+# Mac_CSD_early #2AD0B7
+# Neu_CSD_early #98B304
+# CT_CSD_early_1 #d693b8
+# CT_CSD_early_2 #925677
+# CT_ CSD_early_3 #61394f
+# Epidermis_BL.CSD_early #3200F5
 
 for(ntop in c(100, 200, 300))
 {
@@ -721,9 +788,9 @@ for(ntop in c(100, 200, 300))
   test = res[c(1:ntop), ]
   #test = test[-which(test$ligand == 'SPON1'), ] ## for unknow reason this ligand making problem for plots
   
-  cells.of.interest = unique(c(test$source, test$target))
-  cell_color = randomcoloR::distinctColorPalette(length(cells.of.interest))
-  names(cell_color) <- cells.of.interest
+  #cells.of.interest = unique(c(test$source, test$target))
+  #cell_color = randomcoloR::distinctColorPalette(length(cells.of.interest))
+  #names(cell_color) <- cells.of.interest
   
   my_CircosPlot(test, 
                 weight.attribute = 'weight_norm',
@@ -737,38 +804,94 @@ for(ntop in c(100, 200, 300))
 
 dev.off()
 
-
-
-
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD.pdf')
+############
+### circosPlot for BL and CSD-specific LR
+############
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_CSD_specific.pdf')
 pdf(pdfname, width=12, height = 8)
 
-sender_cells = celltypes[grep('CSD', celltypes)]
+res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
+
+celltypes = unique(aa$celltypes)
+receivers = celltypes
+
+sender_cells = celltypes[grep('BL', celltypes)]
 receiver_cells = sender_cells[grep('CT', sender_cells)]
 
 print(as.character(sender_cells))
 print(as.character(receiver_cells))
 
+head(grep('WNT', res$ligand))
 
+res_BL = res[!is.na(match(res$source, sender_cells)) & !is.na(match(res$target, receiver_cells)), ]
+res_BL = res_BL[order(res_BL$aggregate_rank), ]
+
+head(grep('WNT', res_BL$ligand))
+
+#cell_color = randomcoloR::distinctColorPalette(length(cells.of.interest))
+
+cells.of.interest = unique(c(res$source, res$target))
+cell_color = c("#2AD0B7", "#98B304", "#16005e", "#005e45", "#2f7c67", "#3200F5")
+names(cell_color) <- c("mac_BL_early", "neu_BL_early", "epidermis_BL_early",
+                       "CT_BL_early_1", "CT_BL_early_3", "epidermis_BL.CSD_early")
+
+# Mac_BL_early #2AD0B7
+# Neu_BL_early #98B304
+# Epidermis_BL_early #16005e
+# CT_BL_early_1 #005e45
+# CT_BL_early_3 #2f7c67
+# Epidermis_BL.CSD_early #3200F5
 
 res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
-
 
 res = res[!is.na(match(res$source, sender_cells)) & !is.na(match(res$target, receiver_cells)), ]
 
 res = res[order(res$aggregate_rank), ]
 head(grep('WNT', res$ligand))
 
+cells.of.interest = unique(c(res$source, res$target))
+cell_color = c("#2AD0B7", "#98B304", "#d693b8", "#925677", "#61394f", "#3200F5")
+names(cell_color) <- c("mac_CSD_early", "neu_CSD_early", "CT_CSD_early_1",
+                       "CT_CSD_early_2", "CT_CSD_early_3", "epidermis_BL.CSD_early")
+
+# Mac_CSD_early #2AD0B7
+# Neu_CSD_early #98B304
+# CT_CSD_early_1 #d693b8
+# CT_CSD_early_2 #925677
+# CT_ CSD_early_3 #61394f
+# Epidermis_BL.CSD_early #3200F5
+
 
 for(ntop in c(100, 200, 300))
 {
   # ntop = 300
   test = res[c(1:ntop), ]
+  
+  ## for unknow reason this ligand making problem for plots
+  #test = test[-which(test$ligand == 'SPON1'), ] 
+  
+  my_CircosPlot(test, 
+                weight.attribute = 'weight_norm',
+                cols.use = cell_color,
+                sources.include = cells.of.interest,
+                targets.include = cells.of.interest,
+                lab.cex = 0.4,
+                title = paste('LR scores top :', ntop))
+  
+  
+  test = res[c(1:ntop), ]
+  
   #test = test[-which(test$ligand == 'SPON1'), ] ## for unknow reason this ligand making problem for plots
   
-  cells.of.interest = unique(c(test$source, test$target))
-  cell_color = randomcoloR::distinctColorPalette(length(cells.of.interest))
-  names(cell_color) <- cells.of.interest
+  #cells.of.interest = unique(c(test$source, test$target))
+  #cell_color = randomcoloR::distinctColorPalette(length(cells.of.interest))
+  #names(cell_color) <- cells.of.interest
+  
+  sender_cells = celltypes[grep('CSD', celltypes)]
+  receiver_cells = sender_cells[grep('CT', sender_cells)]
+  
+  print(as.character(sender_cells))
+  print(as.character(receiver_cells))
   
   my_CircosPlot(test, 
                 weight.attribute = 'weight_norm',
@@ -777,6 +900,7 @@ for(ntop in c(100, 200, 300))
                 targets.include = cells.of.interest,
                 lab.cex = 0.5,
                 title = paste('LR scores top :', ntop))
+  
   
 }
 
