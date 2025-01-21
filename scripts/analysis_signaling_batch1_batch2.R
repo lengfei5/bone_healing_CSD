@@ -635,13 +635,10 @@ aa$subtypes = factor(aa$subtypes, levels = sort(unique(aa$subtypes)))
 aa = ScaleData(aa, features = rownames(aa))
 
 Idents(aa) = aa$subtypes
-
-
-## run LIANA
 source("functions_ligandReceptor_analysis.R")
 aa$celltypes = aa$subtypes
 
-
+## run LIANA
 #source(paste0(functionDir, "/functions_cccInference.R"))
 #aa$celltypes = aa$subtypes
 
@@ -892,10 +889,12 @@ if(length(jj)>0){
 }
 saveRDS(test, file = paste0(outDir, '/res_lianaTest_for_circosplot_CSD_ntop200.rds'))
 
-test_bl = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot_BL_ntop200.rds'))
-test_csd = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot_CSD_ntop200.rds'))
 
 Idents(aa) = as.factor(aa$celltypes)
+source(paste0(functionDir, '/functions_cccInference.R'))
+
+test_bl = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot_BL_ntop200.rds'))
+test_csd = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot_CSD_ntop200.rds'))
 
 ggs = unique(c(test_bl$ligand, test_bl$receptor, test_csd$ligand, test_csd$receptor))
 xx = c()
@@ -913,12 +912,13 @@ cells_csd = unique(c(test_csd$source, test_csd$target))
 
 #rm(test)
 ct_bl_csd <- FindMarkers(aa, ident.1 ='CT_BL_early', ident.2 =  "CT_CSD_early",
-                         features = ggs, 
-                         logfc.threshold = 0, min.pct = 0, only.pos = FALSE)
+                         features = ggs, logfc.threshold = 0, min.pct = 0, only.pos = FALSE)
 mac_bl_csd = FindMarkers(aa, ident.1 ='mac_BL_early', ident.2 =  "mac_CSD_early",
                          features = ggs, logfc.threshold = 0, min.pct = 0, only.pos = FALSE)
 neu_bl_csd = FindMarkers(aa, ident.1 ='neu_BL_early', ident.2 =  "neu_CSD_early",
                          features = ggs, logfc.threshold = 0, min.pct = 0, only.pos = FALSE)
+ep_bl_csd = FindMarkers(aa, ident.1 ='epidermis_BL_early', ident.2 =  "epidermis_BL.CSD_early",
+                        features = ggs, logfc.threshold = 0, min.pct = 0, only.pos = FALSE)
 
 ### compute the enrichment score (ES) for Blastema
 test_bl$logFC_ligand = NA
@@ -930,13 +930,13 @@ test_bl$es = NA
 for(n in 1:nrow(test_bl))
 {
   # n = 5
-  
+  cat(n, '\n')
   # receptors
   receptors = unlist(strsplit(as.character(test_bl$receptor[n]), '_'))
   #ii2 = which(rownames(ct_bl_csd) == test_bl$receptor[n])
   ii2 = which(!is.na(match(rownames(ct_bl_csd),  receptors)))
   test_bl$logFC_receptor[n] = mean(ct_bl_csd$avg_log2FC[ii2])
-  test_bl$logPct_receptor[n] = mean(log2(1+ ct_bl_csd$pct.1[ii2]/ct_bl_csd$pct.2[ii2]))
+  test_bl$logPct_receptor[n] = mean(log2(ct_bl_csd$pct.1[ii2]/ct_bl_csd$pct.2[ii2]))
   
   # ligands
   ligands = unlist(strsplit(as.character(test_bl$ligand[n]), '_'))
@@ -944,40 +944,43 @@ for(n in 1:nrow(test_bl))
     #ii1 = which(rownames(ct_bl_csd) == test_bl$ligand[n])
     ii1 = which(!is.na(match(rownames(ct_bl_csd),  ligands)))
     test_bl$logFC_ligand[n] = mean(ct_bl_csd$avg_log2FC[ii1])
-    test_bl$logPct_ligand[n] = mean(log2(1+ ct_bl_csd$pct.1[ii1]/ct_bl_csd$pct.2[ii1]))
-    
+    test_bl$logPct_ligand[n] = mean(log2(ct_bl_csd$pct.1[ii1]/ct_bl_csd$pct.2[ii1]))
   }
   
   if(test_bl$vector[n] == "mac_BL_early - CT_BL_early"){
     ii1 = which(!is.na(match(rownames(mac_bl_csd),  ligands)))
     #ii1 = which(rownames(mac_bl_csd) == test_bl$ligand[n])
     test_bl$logFC_ligand[n] = mean(mac_bl_csd$avg_log2FC[ii1])
-    test_bl$logPct_ligand[n] = mean(log2(1+ mac_bl_csd$pct.1[ii1]/mac_bl_csd$pct.2[ii1]))
-    
+    test_bl$logPct_ligand[n] = mean(log2(mac_bl_csd$pct.1[ii1]/mac_bl_csd$pct.2[ii1]))
   }
   
   if(test_bl$vector[n] == "neu_BL_early - CT_BL_early"){
     ii1 = which(!is.na(match(rownames(neu_bl_csd),  ligands)))
     #ii1 = which(rownames(neu_bl_csd) == test_bl$ligand[n])
     test_bl$logFC_ligand[n] = mean(neu_bl_csd$avg_log2FC[ii1])
-    test_bl$logPct_ligand[n] = mean(log2(1+ neu_bl_csd$pct.1[ii1]/neu_bl_csd$pct.2[ii1]))
-     
+    test_bl$logPct_ligand[n] = mean(log2(neu_bl_csd$pct.1[ii1]/neu_bl_csd$pct.2[ii1]))
   }
   
   if(test_bl$vector[n] == "epidermis_BL.CSD_early - CT_BL_early"){
     #ii1 = which(rownames(neu_bl_csd) == test_bl$ligand[n])
-    test_bl$logFC_ligand[n] = 1
-    test_bl$logPct_ligand[n] = log2(1 + 1)
+    test_bl$logFC_ligand[n] = 0
+    test_bl$logPct_ligand[n] = log2(1)
   }
   
+  if(test_bl$vector[n] == "epidermis_BL_early - CT_BL_early"){
+    ii1 = which(!is.na(match(rownames(ep_bl_csd),  ligands)))
+    #ii1 = which(rownames(neu_bl_csd) == test_bl$ligand[n])
+    test_bl$logFC_ligand[n] = mean(ep_bl_csd$avg_log2FC[ii1])
+    test_bl$logPct_ligand[n] = mean(log2(ep_bl_csd$pct.1[ii1]/ep_bl_csd$pct.2[ii1]))
+  }
 }
 
-test_bl$es = abs(test_bl$logFC_ligand * test_bl$logFC_receptor * 
-                   test_bl$logPct_ligand * test_bl$logPct_receptor)
+test_bl$fc_ligand = 2^test_bl$logFC_ligand
+test_bl$fc_receptor = 2^test_bl$logFC_receptor
+test_bl$pct_ligand = 2^test_bl$logPct_ligand
+test_bl$pct_receptor = 2^test_bl$logPct_receptor
 
-jj = which(test_bl$vector == "epidermis_BL_early - CT_BL_early")
-test_bl$es[jj] = 10
-
+test_bl$es = test_bl$logFC_ligand + test_bl$logFC_receptor + test_bl$logPct_ligand + test_bl$logPct_receptor
 test_bl = test_bl[order(-test_bl$es), ]
 
 cells.of.interest = unique(c(test_bl$source, test_bl$target))
@@ -988,11 +991,11 @@ names(cell_color) <- c("mac_BL_early", "neu_BL_early", "epidermis_BL_early",
                        "CT_BL_early", "epidermis_BL.CSD_early")
 cell_color = cell_color[match(cells.of.interest, names(cell_color))]
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_specific.pdf')
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_specific_v2.pdf')
 pdf(pdfname, width=12, height = 8)
-for(es_cut in seq(0.2, 0.8, by = 0.1))
+for(es_cut in seq(1, 4, by = 1))
 {
-  # es_cut = 0.5
+  # es_cut = 
   test = test_bl[which(test_bl$es > es_cut), ]
   cat('Es cutoff  -- ', es_cut, '--', nrow(test), ' LR \n')
   
@@ -1013,24 +1016,96 @@ for(es_cut in seq(0.2, 0.8, by = 0.1))
                 title = paste('ES cutoff :', es_cut))
   
 }
-
 dev.off()
 
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_CSD_specific.pdf')
-pdf(pdfname, width=12, height = 8)
+### compute the enrichment score (ES) for CSD
+test_csd$logFC_ligand = NA
+test_csd$logFC_receptor = NA
+test_csd$logPct_ligand = NA
+test_csd$logPct_receptor = NA
+test_csd$es = NA
 
-cells.of.interest = unique(c(res$source, res$target))
-cell_color = c("#2AD0B7", "#98B304", "#d693b8", "#925677", "#61394f", "#3200F5")
-names(cell_color) <- c("mac_CSD_early", "neu_CSD_early", "CT_CSD_early_1",
-                       "CT_CSD_early_2", "CT_CSD_early_3", "epidermis_BL.CSD_early")
-
-for(ntop in c(100, 200, 300))
+for(n in 1:nrow(test_csd))
 {
-  # ntop = 300
-  test = res[c(1:ntop), ]
+  # n = 1
+  cat(n, '\n')
+  # receptors
+  receptors = unlist(strsplit(as.character(test_csd$receptor[n]), '_'))
+  #ii2 = which(rownames(ct_bl_csd) == test_csd$receptor[n])
+  ii2 = which(!is.na(match(rownames(ct_bl_csd),  receptors)))
+  test_csd$logFC_receptor[n] = -mean(ct_bl_csd$avg_log2FC[ii2])
+  test_csd$logPct_receptor[n] = -mean(log2(ct_bl_csd$pct.1[ii2]/ct_bl_csd$pct.2[ii2]))
   
-  ## for unknow reason this ligand making problem for plots
+  # ligands
+  ligands = unlist(strsplit(as.character(test_csd$ligand[n]), '_'))
+  if(test_csd$vector[n] == "CT_CSD_early - CT_CSD_early"){
+    #ii1 = which(rownames(ct_bl_csd) == test_csd$ligand[n])
+    ii1 = which(!is.na(match(rownames(ct_bl_csd),  ligands)))
+    test_csd$logFC_ligand[n] = -mean(ct_bl_csd$avg_log2FC[ii1])
+    test_csd$logPct_ligand[n] = -mean(log2(ct_bl_csd$pct.1[ii1]/ct_bl_csd$pct.2[ii1]))
+  }
+  
+  if(test_csd$vector[n] == "mac_CSD_early - CT_CSD_early"){
+    ii1 = which(!is.na(match(rownames(mac_bl_csd),  ligands)))
+    #ii1 = which(rownames(mac_bl_csd) == test_csd$ligand[n])
+    test_csd$logFC_ligand[n] = -mean(mac_bl_csd$avg_log2FC[ii1])
+    test_csd$logPct_ligand[n] = -mean(log2(mac_bl_csd$pct.1[ii1]/mac_bl_csd$pct.2[ii1]))
+  }
+  
+  if(test_csd$vector[n] == "neu_CSD_early - CT_CSD_early"){
+    ii1 = which(!is.na(match(rownames(neu_bl_csd),  ligands)))
+    #ii1 = which(rownames(neu_bl_csd) == test_csd$ligand[n])
+    test_csd$logFC_ligand[n] = -mean(neu_bl_csd$avg_log2FC[ii1])
+    test_csd$logPct_ligand[n] = -mean(log2(neu_bl_csd$pct.1[ii1]/neu_bl_csd$pct.2[ii1]))
+  }
+  
+  if(test_csd$vector[n] == "epidermis_BL.CSD_early - CT_CSD_early"){
+    #ii1 = which(rownames(neu_bl_csd) == test_csd$ligand[n])
+    test_csd$logFC_ligand[n] = 0
+    test_csd$logPct_ligand[n] = log2(1)
+  }
+  
+  # if(test_csd$vector[n] == "epidermis_BL_early - CT_BL_early"){
+  #   ii1 = which(!is.na(match(rownames(ep_bl_csd),  ligands)))
+  #   #ii1 = which(rownames(neu_bl_csd) == test_csd$ligand[n])
+  #   test_csd$logFC_ligand[n] = mean(ep_bl_csd$avg_log2FC[ii1])
+  #   test_csd$logPct_ligand[n] = mean(log2(ep_bl_csd$pct.1[ii1]/ep_bl_csd$pct.2[ii1]))
+  # }
+}
+
+test_csd$fc_ligand = 2^test_csd$logFC_ligand
+test_csd$fc_receptor = 2^test_csd$logFC_receptor
+test_csd$pct_ligand = 2^test_csd$logPct_ligand
+test_csd$pct_receptor = 2^test_csd$logPct_receptor
+
+test_csd$es = test_csd$logFC_ligand + test_csd$logFC_receptor + 
+  test_csd$logPct_ligand + test_csd$logPct_receptor
+test_csd = test_csd[order(-test_csd$es), ]
+
+cells.of.interest = unique(c(test_csd$source, test_csd$target))
+print(cells.of.interest)
+cell_color = c("#2AD0B7", "#98B304", "#d693b8", "#3200F5")
+names(cell_color) <- c("mac_CSD_early", "neu_CSD_early",  "CT_CSD_early", "epidermis_BL.CSD_early")
+
+
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops200_CSD_specific.pdf')
+pdf(pdfname, width=12, height = 8)
+for(es_cut in seq(1, 4, by = 1))
+{
+  # es_cut = 
+  test = test_csd[which(test_csd$es > es_cut), ]
+  cat('Es cutoff  -- ', es_cut, '--', nrow(test), ' LR \n')
+  
+  #jj = which(test$ligand == 'RGMB'|test$receptor == 'RGMB'|
+  #             test$ligand == "FGFR3")
+  jj = which(test$ligand == 'RGMB'|test$receptor == 'RGMB'|
+               test$ligand == 'APP' | test$ligand == 'APP')
+  
+  if(length(jj) >0){
+    test = test[-jj, ]
+  }
+  
   #test = test[-which(test$ligand == 'SPON1'), ] 
   
   my_CircosPlot(test, 
@@ -1038,33 +1113,11 @@ for(ntop in c(100, 200, 300))
                 cols.use = cell_color,
                 sources.include = cells.of.interest,
                 targets.include = cells.of.interest,
-                lab.cex = 0.4,
-                title = paste('LR scores top :', ntop))
-  
-  
-  test = res[c(1:ntop), ]
-  
-  #test = test[-which(test$ligand == 'SPON1'), ] ## for unknow reason this ligand making problem for plots
-  
-  #cells.of.interest = unique(c(test$source, test$target))
-  #cell_color = randomcoloR::distinctColorPalette(length(cells.of.interest))
-  #names(cell_color) <- cells.of.interest
-  
- 
-  
-  my_CircosPlot(test, 
-                weight.attribute = 'weight_norm',
-                cols.use = cell_color,
-                sources.include = cells.of.interest,
-                targets.include = cells.of.interest,
                 lab.cex = 0.5,
-                title = paste('LR scores top :', ntop))
-  
+                title = paste('ES cutoff :', es_cut))
   
 }
-
 dev.off()
-
 
 
 ##########################################
