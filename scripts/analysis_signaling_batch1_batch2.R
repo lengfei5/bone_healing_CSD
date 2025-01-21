@@ -602,6 +602,9 @@ dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20230308/Rdata/'
 ##########################################
 aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
 
+outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes')
+additionalLabel = '_fixedCelltypes'
+
 ## manually merge subclusters
 aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_2')] = 'epidermis_BL_early'
 aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_1')] = 'epidermis_BL_early'
@@ -609,9 +612,22 @@ aa$subtypes[which(aa$subtypes == 'CT_BL_early_2')] = 'CT_BL_early_1'
 
 DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
 
-
 ggsave(filename = paste0(resDir,  '/UMAP_subtypes.pdf'), 
        width = 12, height = 8)
+
+## manually merge again the CT
+merge_CT_subclusters = FALSE
+if(merge_CT_subclusters){
+  aa$subtypes[grep('CT_BL_early', aa$subtypes)] = 'CT_BL_early'
+  
+  aa$subtypes[grep('CT_CSD_early', aa$subtypes)] = 'CT_CSD_early'
+  
+  DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
+  
+  ggsave(filename = paste0(resDir,  '/UMAP_subtypes_afterMergingCT.pdf'), 
+         width = 12, height = 8)
+  
+}
 
 
 aa$subtypes = factor(aa$subtypes, levels = sort(unique(aa$subtypes)))
@@ -622,7 +638,6 @@ Idents(aa) = aa$subtypes
 
 
 ## run LIANA
-outDir = paste0(resDir, '/LR_analysis_LIANA')
 source("functions_ligandReceptor_analysis.R")
 aa$celltypes = aa$subtypes
 
@@ -632,7 +647,7 @@ aa$celltypes = aa$subtypes
 
 liana_test = run_LIANA_defined_celltype(subref = aa, 
                            celltypes = unique(aa$celltypes),
-                           additionalLabel = '_fixedCelltypes')
+                           additionalLabel = additionalLabel)
 
 #liana_test <- liana_test %>%
 #  liana_aggregate(resource = 'Consensus')
@@ -644,7 +659,7 @@ liana_test <- liana_test %>%
   liana_aggregate(resource = 'Consensus')
 
 celltypes = unique(aa$celltypes)
-additionalLabel = '_fixedCelltypes'
+
 receivers = celltypes
 
 df_test = liana_test %>% filter(target %in% receivers & source %in% celltypes) %>% as.data.frame() 
@@ -687,9 +702,9 @@ write.table(res,
 
 saveRDS(res, file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
 
-
-
-## plot circosplot
+##########################################
+### plot circosplot
+##########################################
 #res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
 source(paste0(functionDir, '/functions_cccInference.R'))
 
@@ -697,20 +712,15 @@ celltypes = unique(aa$celltypes)
 additionalLabel = '_fixedCelltypes'
 receivers = celltypes
 
-
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_v2.pdf')
-pdf(pdfname, width=12, height = 8)
-
 sender_cells = celltypes[grep('BL', celltypes)]
 receiver_cells = sender_cells[grep('CT', sender_cells)]
 
 print(as.character(sender_cells))
 print(as.character(receiver_cells))
 
-head(grep('WNT', res$ligand))
-
 res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
 
+head(grep('WNT', res$ligand))
 res = res[!is.na(match(res$source, sender_cells)) & !is.na(match(res$target, receiver_cells)), ]
 
 res = res[order(res$aggregate_rank), ]
@@ -720,10 +730,12 @@ head(grep('WNT', res$ligand))
 #cell_color = randomcoloR::distinctColorPalette(length(cells.of.interest))
 
 cells.of.interest = unique(c(res$source, res$target))
-cell_color = c("#2AD0B7", "#98B304", "#16005e", "#005e45", "#2f7c67", "#3200F5")
-names(cell_color) <- c("mac_BL_early", "neu_BL_early", "epidermis_BL_early",
-                       "CT_BL_early_1", "CT_BL_early_3", "epidermis_BL.CSD_early")
+print(cells.of.interest)
 
+cell_color = c("#2AD0B7", "#98B304", "#16005e", "#005e45", "#3200F5")
+names(cell_color) <- c("mac_BL_early", "neu_BL_early", "epidermis_BL_early",
+                       "CT_BL_early", "epidermis_BL.CSD_early")
+cell_color = cell_color[match(cells.of.interest, names(cell_color))]
 
 # Mac_BL_early #2AD0B7
 # Neu_BL_early #98B304
@@ -732,13 +744,20 @@ names(cell_color) <- c("mac_BL_early", "neu_BL_early", "epidermis_BL_early",
 # CT_BL_early_3 #2f7c67
 # Epidermis_BL.CSD_early #3200F5
 
-
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_v2.pdf')
+pdf(pdfname, width=12, height = 8)
 for(ntop in c(100, 200, 300))
 {
   # ntop = 300
+  cat('top LR -- ', ntop, '\n')
   test = res[c(1:ntop), ]
   
-  ## for unknow reason this ligand making problem for plots
+  jj = which(test$ligand == 'RGMB'|test$receptor == 'RGMB'|
+               test$ligand == "FGFR3")
+  if(length(jj) >0){
+    test = test[-jj, ]
+  }
+  
   #test = test[-which(test$ligand == 'SPON1'), ] 
   
   my_CircosPlot(test, 
@@ -746,16 +765,13 @@ for(ntop in c(100, 200, 300))
                 cols.use = cell_color,
                 sources.include = cells.of.interest,
                 targets.include = cells.of.interest,
-                lab.cex = 0.4,
+                lab.cex = 0.5,
                 title = paste('LR scores top :', ntop))
   
 }
 
 dev.off()
 
-
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_v2.pdf')
-pdf(pdfname, width=12, height = 8)
 
 sender_cells = celltypes[grep('CSD', celltypes)]
 receiver_cells = sender_cells[grep('CT', sender_cells)]
@@ -771,9 +787,10 @@ res = res[order(res$aggregate_rank), ]
 head(grep('WNT', res$ligand))
 
 cells.of.interest = unique(c(res$source, res$target))
-cell_color = c("#2AD0B7", "#98B304", "#d693b8", "#925677", "#61394f", "#3200F5")
-names(cell_color) <- c("mac_CSD_early", "neu_CSD_early", "CT_CSD_early_1",
-                       "CT_CSD_early_2", "CT_CSD_early_3", "epidermis_BL.CSD_early")
+print(cells.of.interest)
+
+cell_color = c("#2AD0B7", "#98B304", "#d693b8", "#3200F5")
+names(cell_color) <- c("mac_CSD_early", "neu_CSD_early",  "CT_CSD_early", "epidermis_BL.CSD_early")
 
 # Mac_CSD_early #2AD0B7
 # Neu_CSD_early #98B304
@@ -782,11 +799,23 @@ names(cell_color) <- c("mac_CSD_early", "neu_CSD_early", "CT_CSD_early_1",
 # CT_ CSD_early_3 #61394f
 # Epidermis_BL.CSD_early #3200F5
 
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_v2.pdf')
+pdf(pdfname, width=12, height = 8)
+
 for(ntop in c(100, 200, 300))
 {
-  # ntop = 300
+  # ntop = 200
+  cat('top LR -- ', ntop, '\n')
   test = res[c(1:ntop), ]
-  #test = test[-which(test$ligand == 'SPON1'), ] ## for unknow reason this ligand making problem for plots
+  
+  # test = test[-which(test$ligand == 'SPON1'), ] ## because one gene can't be both ligand and receptor
+  # https://github.com/msraredon/Connectome/issues/8
+  jj = which(test$ligand == 'RGMB'|test$receptor == 'RGMB'|
+               test$ligand == 'APP' | test$ligand == 'APP')
+  
+  if(length(jj)>0){
+    test = test[-jj, ]
+  }
   
   #cells.of.interest = unique(c(test$source, test$target))
   #cell_color = randomcoloR::distinctColorPalette(length(cells.of.interest))
@@ -804,12 +833,10 @@ for(ntop in c(100, 200, 300))
 
 dev.off()
 
-############
-### circosPlot for BL and CSD-specific LR
-############
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_CSD_specific.pdf')
-pdf(pdfname, width=12, height = 8)
 
+##########################################
+# circosPlot for BL and CSD-specific LR
+##########################################
 res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
 
 celltypes = unique(aa$celltypes)
@@ -828,39 +855,175 @@ res_BL = res_BL[order(res_BL$aggregate_rank), ]
 
 head(grep('WNT', res_BL$ligand))
 
-#cell_color = randomcoloR::distinctColorPalette(length(cells.of.interest))
+ntop = 200
+cat('top LR -- ', ntop, '\n')
+test = res_BL[c(1:ntop), ]
 
-cells.of.interest = unique(c(res$source, res$target))
-cell_color = c("#2AD0B7", "#98B304", "#16005e", "#005e45", "#2f7c67", "#3200F5")
-names(cell_color) <- c("mac_BL_early", "neu_BL_early", "epidermis_BL_early",
-                       "CT_BL_early_1", "CT_BL_early_3", "epidermis_BL.CSD_early")
+jj = which(test$ligand == 'RGMB'|test$receptor == 'RGMB'|
+             test$ligand == "FGFR3")
+if(length(jj) >0){
+  test = test[-jj, ]
+}
 
-# Mac_BL_early #2AD0B7
-# Neu_BL_early #98B304
-# Epidermis_BL_early #16005e
-# CT_BL_early_1 #005e45
-# CT_BL_early_3 #2f7c67
-# Epidermis_BL.CSD_early #3200F5
+saveRDS(test, file = paste0(outDir, '/res_lianaTest_for_circosplot_BL_ntop200.rds'))
+
 
 res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
+sender_cells = celltypes[grep('CSD', celltypes)]
+receiver_cells = sender_cells[grep('CT', sender_cells)]
+
+print(as.character(sender_cells))
+print(as.character(receiver_cells))
 
 res = res[!is.na(match(res$source, sender_cells)) & !is.na(match(res$target, receiver_cells)), ]
 
 res = res[order(res$aggregate_rank), ]
 head(grep('WNT', res$ligand))
 
+ntop = 200
+cat('top LR -- ', ntop, '\n')
+test = res[c(1:ntop), ]
+
+jj = which(test$ligand == 'RGMB'|test$receptor == 'RGMB'|
+             test$ligand == 'APP' | test$ligand == 'APP')
+
+if(length(jj)>0){
+  test = test[-jj, ]
+}
+saveRDS(test, file = paste0(outDir, '/res_lianaTest_for_circosplot_CSD_ntop200.rds'))
+
+test_bl = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot_BL_ntop200.rds'))
+test_csd = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot_CSD_ntop200.rds'))
+
+Idents(aa) = as.factor(aa$celltypes)
+
+ggs = unique(c(test_bl$ligand, test_bl$receptor, test_csd$ligand, test_csd$receptor))
+xx = c()
+for(n in 1:length(ggs))
+{
+  xx = c(xx,  unlist(strsplit(as.character(ggs[n]), '_')))
+}
+ggs = unique(xx)
+rm(xx)
+
+ggs = ggs[which(!is.na(match(ggs, rownames(aa))))]
+
+cells_bl = unique(c(test_bl$source, test_bl$target))
+cells_csd = unique(c(test_csd$source, test_csd$target))
+
+#rm(test)
+ct_bl_csd <- FindMarkers(aa, ident.1 ='CT_BL_early', ident.2 =  "CT_CSD_early",
+                         features = ggs, 
+                         logfc.threshold = 0, min.pct = 0, only.pos = FALSE)
+mac_bl_csd = FindMarkers(aa, ident.1 ='mac_BL_early', ident.2 =  "mac_CSD_early",
+                         features = ggs, logfc.threshold = 0, min.pct = 0, only.pos = FALSE)
+neu_bl_csd = FindMarkers(aa, ident.1 ='neu_BL_early', ident.2 =  "neu_CSD_early",
+                         features = ggs, logfc.threshold = 0, min.pct = 0, only.pos = FALSE)
+
+### compute the enrichment score (ES) for Blastema
+test_bl$logFC_ligand = NA
+test_bl$logFC_receptor = NA
+test_bl$logPct_ligand = NA
+test_bl$logPct_receptor = NA
+test_bl$es = NA
+
+for(n in 1:nrow(test_bl))
+{
+  # n = 5
+  
+  # receptors
+  receptors = unlist(strsplit(as.character(test_bl$receptor[n]), '_'))
+  #ii2 = which(rownames(ct_bl_csd) == test_bl$receptor[n])
+  ii2 = which(!is.na(match(rownames(ct_bl_csd),  receptors)))
+  test_bl$logFC_receptor[n] = mean(ct_bl_csd$avg_log2FC[ii2])
+  test_bl$logPct_receptor[n] = mean(log2(1+ ct_bl_csd$pct.1[ii2]/ct_bl_csd$pct.2[ii2]))
+  
+  # ligands
+  ligands = unlist(strsplit(as.character(test_bl$ligand[n]), '_'))
+  if(test_bl$vector[n] == "CT_BL_early - CT_BL_early"){
+    #ii1 = which(rownames(ct_bl_csd) == test_bl$ligand[n])
+    ii1 = which(!is.na(match(rownames(ct_bl_csd),  ligands)))
+    test_bl$logFC_ligand[n] = mean(ct_bl_csd$avg_log2FC[ii1])
+    test_bl$logPct_ligand[n] = mean(log2(1+ ct_bl_csd$pct.1[ii1]/ct_bl_csd$pct.2[ii1]))
+    
+  }
+  
+  if(test_bl$vector[n] == "mac_BL_early - CT_BL_early"){
+    ii1 = which(!is.na(match(rownames(mac_bl_csd),  ligands)))
+    #ii1 = which(rownames(mac_bl_csd) == test_bl$ligand[n])
+    test_bl$logFC_ligand[n] = mean(mac_bl_csd$avg_log2FC[ii1])
+    test_bl$logPct_ligand[n] = mean(log2(1+ mac_bl_csd$pct.1[ii1]/mac_bl_csd$pct.2[ii1]))
+    
+  }
+  
+  if(test_bl$vector[n] == "neu_BL_early - CT_BL_early"){
+    ii1 = which(!is.na(match(rownames(neu_bl_csd),  ligands)))
+    #ii1 = which(rownames(neu_bl_csd) == test_bl$ligand[n])
+    test_bl$logFC_ligand[n] = mean(neu_bl_csd$avg_log2FC[ii1])
+    test_bl$logPct_ligand[n] = mean(log2(1+ neu_bl_csd$pct.1[ii1]/neu_bl_csd$pct.2[ii1]))
+     
+  }
+  
+  if(test_bl$vector[n] == "epidermis_BL.CSD_early - CT_BL_early"){
+    #ii1 = which(rownames(neu_bl_csd) == test_bl$ligand[n])
+    test_bl$logFC_ligand[n] = 1
+    test_bl$logPct_ligand[n] = log2(1 + 1)
+  }
+  
+}
+
+test_bl$es = abs(test_bl$logFC_ligand * test_bl$logFC_receptor * 
+                   test_bl$logPct_ligand * test_bl$logPct_receptor)
+
+jj = which(test_bl$vector == "epidermis_BL_early - CT_BL_early")
+test_bl$es[jj] = 10
+
+test_bl = test_bl[order(-test_bl$es), ]
+
+cells.of.interest = unique(c(test_bl$source, test_bl$target))
+print(cells.of.interest)
+
+cell_color = c("#2AD0B7", "#98B304", "#16005e", "#005e45", "#3200F5")
+names(cell_color) <- c("mac_BL_early", "neu_BL_early", "epidermis_BL_early",
+                       "CT_BL_early", "epidermis_BL.CSD_early")
+cell_color = cell_color[match(cells.of.interest, names(cell_color))]
+
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_specific.pdf')
+pdf(pdfname, width=12, height = 8)
+for(es_cut in seq(0.2, 0.8, by = 0.1))
+{
+  # es_cut = 0.5
+  test = test_bl[which(test_bl$es > es_cut), ]
+  cat('Es cutoff  -- ', es_cut, '--', nrow(test), ' LR \n')
+  
+  jj = which(test$ligand == 'RGMB'|test$receptor == 'RGMB'|
+               test$ligand == "FGFR3")
+  if(length(jj) >0){
+    test = test[-jj, ]
+  }
+  
+  #test = test[-which(test$ligand == 'SPON1'), ] 
+  
+  my_CircosPlot(test, 
+                weight.attribute = 'weight_norm',
+                cols.use = cell_color,
+                sources.include = cells.of.interest,
+                targets.include = cells.of.interest,
+                lab.cex = 0.5,
+                title = paste('ES cutoff :', es_cut))
+  
+}
+
+dev.off()
+
+
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_CSD_specific.pdf')
+pdf(pdfname, width=12, height = 8)
+
 cells.of.interest = unique(c(res$source, res$target))
 cell_color = c("#2AD0B7", "#98B304", "#d693b8", "#925677", "#61394f", "#3200F5")
 names(cell_color) <- c("mac_CSD_early", "neu_CSD_early", "CT_CSD_early_1",
                        "CT_CSD_early_2", "CT_CSD_early_3", "epidermis_BL.CSD_early")
-
-# Mac_CSD_early #2AD0B7
-# Neu_CSD_early #98B304
-# CT_CSD_early_1 #d693b8
-# CT_CSD_early_2 #925677
-# CT_ CSD_early_3 #61394f
-# Epidermis_BL.CSD_early #3200F5
-
 
 for(ntop in c(100, 200, 300))
 {
@@ -887,11 +1050,7 @@ for(ntop in c(100, 200, 300))
   #cell_color = randomcoloR::distinctColorPalette(length(cells.of.interest))
   #names(cell_color) <- cells.of.interest
   
-  sender_cells = celltypes[grep('CSD', celltypes)]
-  receiver_cells = sender_cells[grep('CT', sender_cells)]
-  
-  print(as.character(sender_cells))
-  print(as.character(receiver_cells))
+ 
   
   my_CircosPlot(test, 
                 weight.attribute = 'weight_norm',
@@ -908,10 +1067,10 @@ dev.off()
 
 
 
-
-
+##########################################
 ##########################################
 # Test NicheNet 
+##########################################
 ##########################################
 aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
 
