@@ -73,6 +73,7 @@ tfs = readRDS(file = paste0('/groups/tanaka/People/current/jiwang/projects/RA_co
                             '/annotations/curated_human_TFs_Lambert.rds'))
 tfs = unique(tfs$`HGNC symbol`)
 
+
 ########################################################
 ########################################################
 # Section 0: prepare the scRNA-seq samples  
@@ -1107,7 +1108,6 @@ for(es_cut in seq(1, 4, by = 1))
   }
   
   #test = test[-which(test$ligand == 'SPON1'), ] 
-  
   my_CircosPlot(test, 
                 weight.attribute = 'weight_norm',
                 cols.use = cell_color,
@@ -1117,6 +1117,7 @@ for(es_cut in seq(1, 4, by = 1))
                 title = paste('ES cutoff :', es_cut))
   
 }
+
 dev.off()
 
 
