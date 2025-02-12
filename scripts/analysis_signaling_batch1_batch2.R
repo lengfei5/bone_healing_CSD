@@ -205,7 +205,9 @@ saveRDS(xx, file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs_harmon
 # connective tissue, epidermis, macrophage, neutrophils
 ########################################################
 ########################################################
-aa = readRDS( file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs_harmony.twoBatches.rds'))
+
+aa = readRDS(file = paste0("../results/scRNAseq_signaling.analysis_axolotl_20240116/Rdata", 
+                           '/BL.CSD_merged_renormalized_8000HVGs_harmony.twoBatches.rds'))
 
 Idents(aa) = aa$celltype
 
@@ -224,6 +226,7 @@ p1 = DimPlot(aa, label = TRUE, repel = TRUE)
 p2 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE) + NoLegend()
 p1 + p2
 
+Idents(aa) = aa$celltype
 xx = subset(aa, idents = c('Connective Tissue', 'Epidermis', 'Macrophages', 'Neutrophils'))
 DimPlot(xx, group.by = 'celltype',  label = TRUE, repel = TRUE)
 
@@ -588,7 +591,6 @@ ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_TFs_by_', cell_ids, '.pd
        width = 12, height = 30)
 
 
-
 ########################################################
 ########################################################
 # Section II : ligand-receptor anlaysis
@@ -596,12 +598,15 @@ ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_TFs_by_', cell_ids, '.pd
 # test LIANA and NicheNet using clusters 
 ########################################################
 ########################################################
+
 dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20230308/Rdata/'
+aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
 
 ##########################################
 # test LIANA for all pairs
 ##########################################
-aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
+#dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20240116/Rdata/'
+#aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds'))
 
 outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes')
 additionalLabel = '_fixedCelltypes'
@@ -615,6 +620,15 @@ DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
 
 ggsave(filename = paste0(resDir,  '/UMAP_subtypes.pdf'), 
        width = 12, height = 8)
+
+p1 = DimPlot(aa, group.by = 'condition', label = TRUE, repel = TRUE)
+p2 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE)
+
+p1 + p2
+
+ggsave(filename = paste0(resDir,  '/UMAP_condition_celltype.pdf'),
+       width = 16, height = 6)
+
 
 ## manually merge again the CT
 merge_CT_subclusters = FALSE

@@ -23,7 +23,11 @@ library(patchwork)
 library(ggplot2)
 library(pheatmap)
 
-aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds'))
+dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20230308/Rdata/'
+
+aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds'))
+
+DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE)
 
 aa$celltype[which(aa$celltype == 'connective tissue')] = 'CT'
 Idents(aa) = aa$celltype
