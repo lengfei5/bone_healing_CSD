@@ -899,7 +899,9 @@ make_ligand_receptor_lfc_plot_customized = function(receiver_oi,
                                                     prioritization_tbl_ligand_receptor, 
                                                     plot_legend = TRUE, 
                                                     heights = NULL, 
-                                                    widths = NULL)
+                                                    widths = NULL,
+                                                    custom_scale_fill = 
+                                                      scale_fill_viridis_c(option = "magma"))
 {
   # prioritization_tbl_ligand_receptor = prioritization_tables$prioritization_tbl_ligand_receptor
   
@@ -937,12 +939,13 @@ make_ligand_receptor_lfc_plot_customized = function(receiver_oi,
   
   plot_data = prioritization_tbl_ligand_receptor %>% inner_join(ordered_ligand_receptors)
   
+  ## here use the default logFC of ligand as NicheNet, NOT taking into account the activity
   p_lig_lfc = plot_data %>% 
-    mutate(scores_test = abs(scaled_activity_normalized) * abs(ligand_score)) %>%
+    #mutate(scores_test = abs(scaled_activity_normalized) * abs(ligand_score)) %>%
     #filter(receiver %in% niches[[1]]$receiver) %>%
     #filter(niche %in% names(niches)[1]) %>% 
-    #ggplot(aes(sender, ligand_receptor_ordered, fill = ligand_score)) +
-    ggplot(aes(sender, ligand_receptor_ordered, fill = scores_test)) +
+    ggplot(aes(sender, ligand_receptor_ordered, fill = ligand_score)) +
+    #ggplot(aes(sender, ligand_receptor_ordered, fill = scores_test)) +
     geom_tile(color = "black") +
     facet_grid(~niche, scales = "free", space = "free") +
     scale_x_discrete(position = "top") +
@@ -966,13 +969,13 @@ make_ligand_receptor_lfc_plot_customized = function(receiver_oi,
     labs(fill = "Ligand:\nmin LFC vs\nother niches") + 
     ylab("Prioritized Ligand-Receptor pairs") + xlab("Ligand LFC\n in Sender")
   
-  max_lfc = max(abs(plot_data$ligand_score) %>% max(), abs(plot_data$receptor_score) %>% max())
-  custom_scale_fill = scale_fill_gradientn(colours = RColorBrewer::brewer.pal(n = 7, name = "OrRd"), 
-                                           #%>% 
-                                           #   rev(),
-                                           # values = c(0, 0.350, 0.4850, 0.5, 0.5150, 0.65, 1),  
-                                           #limits = c(-1*max_lfc, max_lfc),
-                                           limits = c(0, max_lfc),
+  max_lfc = 0.8*max(abs(plot_data$ligand_score) %>% max(), abs(plot_data$receptor_score) %>% max())
+  
+  custom_scale_fill = scale_fill_gradientn(colours = RColorBrewer::brewer.pal(n = 7, name = "PRGn"),
+                                           #%>% rev(),
+                                           values = c(0, 0.350, 0.4850, 0.5, 0.5150, 0.65, 1),
+                                           limits = c(-1*max_lfc, max_lfc)
+                                           #limits = c(0, max_lfc),
   )
   
   p_lig_lfc = p_lig_lfc + custom_scale_fill
@@ -1037,14 +1040,20 @@ make_ligand_receptor_lfc_plot_customized = function(receiver_oi,
       strip.background.y = element_blank(),
       strip.text.y = element_blank()
     ) + labs(fill = "Receptor:\nmin LFC vs\nother niches")  + xlab("Receptor LFC\n in Receiver")
-  max_lfc = max(abs(plot_data$ligand_score) %>% max(), abs(plot_data$receptor_score) %>% max())
-  custom_scale_fill = scale_fill_gradientn(colours = RColorBrewer::brewer.pal(n = 7, name = "RdBu") %>% rev(),values = c(0, 0.350, 0.4850, 0.5, 0.5150, 0.65, 1),  limits = c(-1*max_lfc, max_lfc))
-  
+  max_lfc = 0.8*max(abs(plot_data$ligand_score) %>% max(), abs(plot_data$receptor_score) %>% max())
+  custom_scale_fill = scale_fill_gradientn(colours = RColorBrewer::brewer.pal(n = 7, name = "PRGn"),
+                                           #%>% rev(),
+                                           values = c(0, 0.350, 0.4850, 0.5, 0.5150, 0.65, 1),  
+                                           limits = c(-1*max_lfc, max_lfc))
+
   p_rec_lfc = p_rec_lfc + custom_scale_fill
   p_rec_lfc
   
   design = "A#B"
-  p_LR_pair = patchwork::wrap_plots(A = p_lig_lfc, B = p_rec_lfc + ylab(""), nrow = 1, guides = "collect", design = design, widths = c(plot_data$sender %>% unique() %>% length(), 1 ,plot_data$receiver %>% unique() %>% length() +0.5))
+  p_LR_pair = patchwork::wrap_plots(A = p_lig_lfc, B = p_rec_lfc + ylab(""), nrow = 1, guides = "collect", 
+                                    design = design, 
+                                    widths = c(plot_data$sender %>% unique() %>% length(), 1,
+                                               plot_data$receiver %>% unique() %>% length() +0.5))
   p_LR_pair
   
   

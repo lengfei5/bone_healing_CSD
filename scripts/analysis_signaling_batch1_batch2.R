@@ -598,7 +598,7 @@ ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_TFs_by_', cell_ids, '.pd
 # test LIANA and NicheNet using clusters 
 ########################################################
 ########################################################
-
+## LR interaction using only the cells from batch1
 dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20230308/Rdata/'
 aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
 
@@ -611,10 +611,19 @@ aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5
 outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes')
 additionalLabel = '_fixedCelltypes'
 
+aa$condition = droplevels(aa$condition)
+
+p1 = DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
+p2 = DimPlot(aa, group.by = 'condition', label = TRUE, repel = TRUE)
+p1 + p2
+
+table(aa$subtypes, aa$condition)
+
+
 ## manually merge subclusters
-aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_2')] = 'epidermis_BL_early'
-aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_1')] = 'epidermis_BL_early'
-aa$subtypes[which(aa$subtypes == 'CT_BL_early_2')] = 'CT_BL_early_1'
+#aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_2')] = 'epidermis_BL_early'
+#aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_1')] = 'epidermis_BL_early'
+#aa$subtypes[which(aa$subtypes == 'CT_BL_early_2')] = 'CT_BL_early_1'
 
 DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
 
@@ -628,6 +637,72 @@ p1 + p2
 
 ggsave(filename = paste0(resDir,  '/UMAP_condition_celltype.pdf'),
        width = 16, height = 6)
+
+Subset_epidermis = FALSE
+if(Subset_epidermis){
+  celltype2subset = 'epidermis'
+  
+  cells = colnames(aa)[which(aa$celltype == celltype2subset)]
+  sub.obj = subset(aa, cells = cells) 
+  
+  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 3000)
+  sub.obj = ScaleData(sub.obj)
+  sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
+  ElbowPlot(sub.obj, ndims = 30)
+  
+  nb.pcs = 30 # nb of pcs depends on the considered clusters or ids
+  n.neighbors = 30; min.dist = 0.3;
+  sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", 
+                     dims = 1:nb.pcs, 
+                     n.neighbors = n.neighbors,
+                     min.dist = min.dist)
+  
+  sub.obj$condition = droplevels(sub.obj$condition)
+  sub.obj$subtypes[which(sub.obj$condition == 'CSD_3dpa')] = 'epidermis_BL.CSD_early'
+  
+  
+  p1 = DimPlot(sub.obj, group.by = 'condition', label = TRUE, repel = TRUE)
+  p2 = DimPlot(sub.obj, group.by = 'subtypes', label = TRUE, repel = TRUE)
+  
+  p1 + p2
+  
+  
+  ggsave(filename = paste0(outDir, celltype2subset, '_condtion_subtype.pdf'), 
+         width = 16, height = 8)
+  
+  sub.obj <- FindNeighbors(sub.obj, dims = 1:20,  k.param = 30)
+  sub.obj <- FindClusters(sub.obj, resolution = 0.3)
+  
+  p1 = DimPlot(sub.obj, label = TRUE, repel = TRUE)
+  p2 = DimPlot(sub.obj, group.by = 'groups', label = TRUE, repel = TRUE)
+  
+  p1 | p2
+  
+  saveRDS(sub.obj, file = paste0(RdataDir, '/Early_subset_epidermis.rds'))
+  
+  
+  ggsave(filename = paste0(outDir, celltype2subset, '_groups_subclustering.pdf'), 
+         width = 14, height = 6)
+  
+  ## assign new labels
+  sub.obj$subtypes = NA
+  sub.obj$subtypes[which(sub.obj$seurat_clusters == '2'| sub.obj$seurat_clusters == '3'|
+                           sub.obj$seurat_clusters == '4')] = 'epidermis_BL.CSD_early'
+  
+  sub.obj$subtypes[which(sub.obj$seurat_clusters == '0')] = 'epidermis_BL_early_1'
+  sub.obj$subtypes[which(sub.obj$seurat_clusters == '1')] = 'epidermis_BL_early_2'
+  
+  DimPlot(sub.obj, group.by = 'subtypes', label = TRUE, repel = TRUE)
+  
+  ggsave(filename = paste0(outDir, celltype2subset, '_groups_subclustering_manual_labels.pdf'), 
+         width = 8, height = 6) 
+  
+  aa$subtypes[match(colnames(sub.obj), colnames(aa))] = sub.obj$subtypes
+  DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
+  
+  
+  
+}
 
 
 ## manually merge again the CT

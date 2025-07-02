@@ -59,6 +59,7 @@ cols[1] = 'gray60'
 cols[2:4] = colorRampPalette((brewer.pal(n = 3, name ="Blues")))(3)
 cols[5:8] = colorRampPalette((brewer.pal(n = 4, name ="OrRd")))(4)
 
+
 ########################################################
 ########################################################
 # Section 0: prepare the scRNA-seq samples  
@@ -878,8 +879,269 @@ Idents(aa) = aa$subtypes
 
 
 ## test NicheNet
+#outDir = paste0(resDir, '/LR_analysis_NicheNet_v1')
+#source("functions_ligandReceptor_analysis.R")
+
+
+##########################################
+# redo the heatmap plots for NicheNet  
+##########################################
+library(nichenetr)
+library(Seurat) # please update to Seurat V4
+library(tidyverse)
+library(circlize)
+library(RColorBrewer)
+require(scran)
+require(scater)
 outDir = paste0(resDir, '/LR_analysis_NicheNet_v1')
-source("functions_ligandReceptor_analysis.R")
+
+refs = aa
+
+refs$celltypes = refs$subtypes
+
+table(refs$celltypes)
+Idents(refs) = as.factor(refs$celltypes)
+
+ntop = c(50, 100, 200)
+
+timepoint = 'early'
+celltypes = c('CT_BL', 'epidermis_BL', 'mac_BL', 'neu_BL')  
+celltypes_ctl = c('CT_CSD', 'epidermis_BL.CSD', 'mac_CSD', 'neu_CSD')
+
+receivers = celltypes
+receivers_ctl = celltypes_ctl
+
+celltypes_sel = unique(c(celltypes, receivers, 
+                         celltypes_ctl, receivers_ctl)
+)
+
+Idents(refs) = as.factor(refs$celltypes)
+subref = subset(refs, cells = colnames(refs)[!is.na(match(refs$celltypes, celltypes_sel))])
+subref$celltypes = droplevels(as.factor(subref$celltypes))
+table(subref$celltypes)
+
+rm(celltypes_sel)
+
+cat('celltype to consider -- ', names(table(subref$celltypes)), '\n')
+table(subref$celltypes)
+
+set.seed(0)
+subref = subset(x = subref, downsample = 3000) # downsample the CM and EC for the sake of speed
+table(subref$celltypes)
+Idents(subref) = subref$celltypes
+
+Gene.filtering.preprocessing = TRUE
+if(Gene.filtering.preprocessing){
+  sce <- as.SingleCellExperiment(subref)
+  ggs = rownames(sce)
+  
+  colLabels(sce) = as.factor(sce$celltypes)
+  rownames(sce) = get_geneName(rownames(sce))
+  
+  ave.counts <- calculateAverage(sce, assay.type = "counts")
+  
+  #hist(log10(ave.counts), breaks=100, main="", col="grey80",
+  #     xlab=expression(Log[10]~"average count"))
+  
+  num.cells <- nexprs(sce, byrow=TRUE)
+  #smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
+  #              xlab=expression(Log[10]~"average count"))
+  
+  # detected in >= 10 cells, ave.counts cutoff are both very lose
+  genes.to.keep <- num.cells > 5 & ave.counts >= 10^-5  & ave.counts <10^4  
+  summary(genes.to.keep)
+  sce <- sce[genes.to.keep, ]
+  ggs = ggs[genes.to.keep]
+  
+  rownames(sce) = make.names(rownames(sce), unique = TRUE)
+  
+  geneDup = data.frame(gene = ggs, gg.uniq = rownames(sce), stringsAsFactors = FALSE)
+  geneDup$geneSymbol = get_geneName(geneDup$gene)
+  
+  kk = which(geneDup$geneSymbol != geneDup$gg.uniq)
+  
+  subref = as.Seurat(sce, counts = "counts", data = "logcounts")
+  rm(sce)
+  Idents(subref) = as.factor(subref$celltypes)
+  
+  # saveRDS(geneDup, paste0(outDir, '/geneSymbol_duplication_inLRanalysis.rds'))
+  
+}
+
+##########################################
+#subref = readRDS(file = paste0(outDir, '/seuratObject_snRNAseq_subset_for_NicheNet.rds'))
+#subref = subset(x = subref, downsample = 1000) 
+table(subref$celltypes)
+subref$celltype = subref$celltypes
+seurat_obj = SetIdent(subref, value = "celltype")
+
+table(seurat_obj$celltypes)
+#seurat_obj$celltype = as.factor(seurat_obj$celltypes)
+Idents(seurat_obj) = seurat_obj$celltype
+rm(subref)
+
+seurat_obj$celltype = as.factor(seurat_obj$celltype)
+table(seurat_obj$celltype)
+
+cat('cell types : ', celltypes, '\n')
+cat('cell types in control niches : ', celltypes_ctl, '\n')
+
+# receiver_cells = 'CM_BZ'
+cat('--- receiver cells in main niches: ', receivers, ' ---\n')
+cat('--- receiver cells in control niches: ', receivers_ctl, ' ---\n')
+
+lfc_cutoff = 0.15
+expression_pct = 0.10
+top_n_target = 500
+
+n = 1
+receiver = receivers[n] 
+receiver_ctl = receivers_ctl[n]
+
+cat('-- define niches with receiver ', receiver, ' and control ', receiver_ctl, '--\n')
+
+# define the niches
+niches = list(
+  "sample_niche" = list(
+    "sender" = celltypes, # including autocrine
+    "receiver" = receiver),
+  "control_niche" = list(
+    "sender" = celltypes_ctl, 
+    "receiver" = receiver_ctl)
+)
+
+
+res = readRDS(file = paste0(outDir, '/nichenet_prioritization_tables_output',
+                           '_receiver.', receiver,
+                           '_receiver.control.', receiver_ctl, 
+                           '_timepoint.', timepoint, '.rds'))
+
+prioritization_tables = res[[1]]
+output = res[[2]]
+
+##########################################
+# 8). Visualization of the Differential NicheNet output 
+##########################################
+top_ligand_niche_df = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+  dplyr::select(niche, sender, receiver, ligand, receptor, prioritization_score) %>% 
+  group_by(ligand) %>% 
+  top_n(1, prioritization_score) %>% 
+  ungroup() %>% 
+  dplyr::select(ligand, receptor, niche) %>% 
+  dplyr::rename(top_niche = niche)
+
+top_ligand_receptor_niche_df = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+  dplyr::select(niche, sender, receiver, ligand, receptor, prioritization_score) %>% 
+  group_by(ligand, receptor) %>% 
+  top_n(1, prioritization_score) %>% 
+  ungroup() %>% 
+  dplyr::select(ligand, receptor, niche) %>% 
+  dplyr::rename(top_niche = niche)
+
+for(ntop in c(50, 100, 200))
+{
+  # ntop = 50
+  cat('ntop -- ', ntop, '\n')
+  ligand_prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+    dplyr::select(niche, sender, receiver, ligand, prioritization_score) %>% 
+    group_by(ligand, niche) %>% top_n(1, prioritization_score) %>% 
+    ungroup() %>% distinct() %>% 
+    inner_join(top_ligand_niche_df) %>% 
+    filter(niche == top_niche) %>% 
+    group_by(niche) %>% 
+    top_n(n = ntop, prioritization_score) %>% 
+    ungroup() # get the top50 ligands per niche
+  
+  receiver_oi = receiver
+  
+  filtered_ligands = ligand_prioritized_tbl_oi %>% 
+    filter(receiver == receiver_oi) %>% 
+    pull(ligand) %>% unique()
+  
+  prioritized_tbl_oi = prioritization_tables$prioritization_tbl_ligand_receptor %>% 
+    filter(ligand %in% filtered_ligands) %>% 
+    dplyr::select(niche, sender, receiver, ligand,  receptor, ligand_receptor, prioritization_score) %>% 
+    distinct() %>% 
+    inner_join(top_ligand_receptor_niche_df) %>% 
+    group_by(ligand) %>% 
+    filter(receiver == receiver_oi) %>% 
+    top_n(2, prioritization_score) %>% ungroup() 
+  
+  ## default plot from NicheNet
+  lfc_plot = make_ligand_receptor_lfc_plot(receiver_oi, 
+                                                      prioritized_tbl_oi, 
+                                                      prioritization_tables$prioritization_tbl_ligand_receptor, 
+                                                      plot_legend = FALSE, 
+                                                      heights = NULL, widths = NULL
+                                                      #custom_scale_fill = scico::scale_fill_scico(palette = "vik")
+                                                      #custom_scale_fill = scale_fill_gradient(low="blue", high="red")
+                                                      #custom_scale_fill = scale_fill_gradient(low=palette_AP4[4], 
+                                                      #                                         high=palette_AP4[12])
+                                                      #custom_scale_fill = scale_fill_gradient(low="#F8F7F5", 
+                                                      #                                        high="#6B1A70")
+                                                      #custom_scale_fill = scico::scale_fill_scico(palette = "lajolla")
+                                                      #custom_scale_fill = scale_fill_viridis_c(option = "magma")
+                                                      #custom_scale_fill = scale_color_gradient(low = "#F3B2DB", high = "#6B1A70")
+  )
+  lfc_plot
+  
+  
+ 
+  
+  palette_AP4 <- colorRampPalette(colors = c("#CFD2DC","#F3B2DB", "#B25E91", "#6B1A70"))(12)
+  scales::show_col(palette_AP4[4:12])
+  scale_color_gradient(low = "#F3B2DB", high = "#6B1A70")
+  
+  custom_scale_fill = scale_fill_gradientn(colours = RColorBrewer::brewer.pal(n = 7, name = "RdBu") %>% rev())
+  
+  source('functions_ligandReceptor_analysis.R')
+  lfc_plot = make_ligand_receptor_lfc_plot_customized(receiver_oi, 
+                                           prioritized_tbl_oi, 
+                                           prioritization_tables$prioritization_tbl_ligand_receptor, 
+                                           plot_legend = FALSE, 
+                                           heights = NULL, widths = NULL,
+                                           custom_scale_fill = custom_scale_fill
+                                           #custom_scale_fill = scico::scale_fill_scico(palette = "vik")
+                                           #custom_scale_fill = scale_fill_gradient(low="blue", high="red")
+                                           #custom_scale_fill = scale_fill_gradient(low=palette_AP4[4], 
+                                           #                                         high=palette_AP4[12])
+                                           #custom_scale_fill = scale_fill_gradient(low="#F8F7F5", 
+                                           #                                         high="#6B1A70")
+                                           #custom_scale_fill = scico::scale_fill_scico(palette = "lajolla")
+                                           #custom_scale_fill = scale_fill_viridis_c(option = "magma")
+                                           #custom_scale_fill = scale_color_gradient(low = "#F3B2DB", high = "#6B1A70")
+                                           )
+  lfc_plot
+  
+  ggsave(paste0(outDir, '/Ligand_receptors_LFC', 
+                '_receiver.', receiver,
+                '_receiver.control.', receiver_ctl, 
+                '_timepoint.', timepoint,
+                '_ntop.', ntop, '_almostFinalVersion.pdf'), 
+         width = 12, height = 12*ntop/50, limitsize = FALSE)
+  
+  
+  # exprs_activity_target_plot = 
+  #   make_ligand_activity_target_exprs_plot(receiver_oi, 
+  #                                          prioritized_tbl_oi,  
+  #                                          prioritization_tables$prioritization_tbl_ligand_receptor,  
+  #                                          prioritization_tables$prioritization_tbl_ligand_target, 
+  #                                          output$exprs_tbl_ligand,  
+  #                                          output$exprs_tbl_target, 
+  #                                          lfc_cutoff, 
+  #                                          ligand_target_matrix, 
+  #                                          plot_legend = FALSE, 
+  #                                          heights = NULL, widths = NULL)
+  # 
+  # exprs_activity_target_plot$combined_plot
+  # ggsave(paste0(outDir, '/Combined_plots_ligand_noFiltering',
+  #               '_receiver.', receiver,
+  #               '_receiver.control.', receiver_ctl, 
+  #               '_timepoint.', timepoint,
+  #               '_ntop.', ntop, '_v2.pdf'), 
+  #               width = 60, height = 12*ntop/50, limitsize = FALSE)
+}
+
 
 
 ########################################################
@@ -1072,32 +1334,3 @@ for(n in 1:length(genes))
 }
 
 dev.off()
-
-
-# 
-# tfs = unique(c(tfs, "Zfp703"))
-# tfs_sel = intersect(tfs, markers_saved)
-# 
-# pdfname = paste0(saveDir, "gene_examples_TFs.pdf")
-# pdf(pdfname, width=24, height = 6)
-# par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-# 
-# #for(n in 1:20)
-# for(n in 1:length(tfs_sel))
-# {
-#   # n = 1
-#   gg = sps_sels[n];
-#   # gg = "Foxa2"
-#   cat(n, '--', gg, '\n')
-#   
-#   p1 = FeaturePlot(aa, features = gg)
-#   p2 = VlnPlot(aa, features = gg, group.by = 'condition', pt.size = 0.01)  + NoLegend()  
-#   #scale_fill_manual(values=c("blue", 'green', "red",  "blue", 
-#   #                           'red', 'green', 'blue', 'green', 'red', 'green', 'green'))
-#   p3 = VlnPlot(aa, features = gg, group.by = 'clusters', pt.size = 0.01) + NoLegend()
-#   plot(p1 | p2| p3)
-#   
-# }
-# 
-# dev.off()
-# 
