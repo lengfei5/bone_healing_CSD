@@ -1,6 +1,6 @@
 ##########################################################################
 ##########################################################################
-# Project: Natasia's CSD project
+# Project: Natasya's CSD project
 # Script purpose: analyze the signaling pathway for BL and CSD scRNA-seq data
 # Usage example: 
 # Author: Jingkui Wang (jingkui.wang@imp.ac.at)
