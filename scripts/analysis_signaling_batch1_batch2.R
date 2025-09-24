@@ -792,6 +792,14 @@ saveRDS(res, file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
 ##########################################
 ### plot circosplot
 ##########################################
+library(OmnipathR)
+library(dplyr)
+#icn <- OmnipathR::import_intercell_network(ligand_receptor = TRUE)
+
+icn = read.table(file = '../omnipath-intercell-network.tsv', sep = '\t', header = TRUE)
+icn = icn[which(icn$secreted_intercell_source == TRUE), ]
+secreted_ligands = unique(icn$genesymbol_intercell_source)
+
 #res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
 source(paste0(functionDir, '/functions_cccInference.R'))
 
@@ -808,7 +816,9 @@ print(as.character(receiver_cells))
 res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
 
 head(grep('WNT', res$ligand))
-res = res[!is.na(match(res$source, sender_cells)) & !is.na(match(res$target, receiver_cells)), ]
+
+res = res[!is.na(match(res$source, as.character(sender_cells))) & 
+            !is.na(match(res$target, as.character(receiver_cells))), ]
 
 res = res[order(res$aggregate_rank), ]
 
