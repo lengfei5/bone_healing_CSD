@@ -794,8 +794,7 @@ saveRDS(res, file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
 ##########################################
 library(OmnipathR)
 library(dplyr)
-#icn <- OmnipathR::import_intercell_network(ligand_receptor = TRUE)
-
+#icn <- OmnipathR::import_intercell_network(ligand_receptor = TRUE) 
 icn = read.table(file = '../omnipath-intercell-network.tsv', sep = '\t', header = TRUE)
 icn = icn[which(icn$secreted_intercell_source == TRUE), ]
 secreted_ligands = unique(icn$genesymbol_intercell_source)
