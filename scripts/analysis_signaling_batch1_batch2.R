@@ -621,9 +621,10 @@ table(aa$subtypes, aa$condition)
 
 
 ## manually merge subclusters
-#aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_2')] = 'epidermis_BL_early'
-#aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_1')] = 'epidermis_BL_early'
-#aa$subtypes[which(aa$subtypes == 'CT_BL_early_2')] = 'CT_BL_early_1'
+aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_2')] = 'epidermis_BL_early'
+aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_1')] = 'epidermis_BL_early'
+aa$subtypes[which(aa$subtypes == 'CT_BL_early_2')] = 'CT_BL_early_1'
+
 
 DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
 
@@ -728,6 +729,8 @@ Idents(aa) = aa$subtypes
 source("functions_ligandReceptor_analysis.R")
 aa$celltypes = aa$subtypes
 
+saveRDS(aa, file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_MergedCT.rds'))
+
 ## run LIANA
 #source(paste0(functionDir, "/functions_cccInference.R"))
 #aa$celltypes = aa$subtypes
@@ -794,16 +797,28 @@ saveRDS(res, file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
 ##########################################
 library(OmnipathR)
 library(dplyr)
+source(paste0(functionDir, '/functions_cccInference.R'))
+dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20230308/Rdata/'
+
+outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes')
+additionalLabel = '_fixedCelltypes'
+
 #icn <- OmnipathR::import_intercell_network(ligand_receptor = TRUE) 
 icn = read.table(file = '../omnipath-intercell-network.tsv', sep = '\t', header = TRUE)
 icn = icn[which(icn$secreted_intercell_source == TRUE), ]
 secreted_ligands = unique(icn$genesymbol_intercell_source)
 
+manual_ligands = readxl::read_xlsx('../geneLIANA-efiltered-excludedECMstructural260925.xlsx')
+manual_ligands$gene[which(manual_ligands$gene == 'FREM1')] = "FRAS1_FREM1_NPNT"
+manual_ligands$gene[which(manual_ligands$gene == 'FREM2')] = "FRAS1_FREM2_NPNT"
+
+
 #res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
-source(paste0(functionDir, '/functions_cccInference.R'))
+aa = readRDS(file = paste0(dataDir, 
+                           '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_MergedCT.rds'))
+
 
 celltypes = unique(aa$celltypes)
-additionalLabel = '_fixedCelltypes'
 receivers = celltypes
 
 sender_cells = celltypes[grep('BL', celltypes)]
@@ -839,8 +854,33 @@ cell_color = cell_color[match(cells.of.interest, names(cell_color))]
 # CT_BL_early_1 #005e45
 # CT_BL_early_3 #2f7c67
 # Epidermis_BL.CSD_early #3200F5
+ligands_BL = manual_ligands$gene[which(manual_ligands$`BL or CSD` == 'BL')]
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_v2.pdf')
+mm = match(ligands_BL, res$ligand)
+xx_bl = res[!is.na(match(res$ligand, ligands_BL)), ]
+
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_manualSelectedLigands_v4.pdf')
+pdf(pdfname, width=12, height = 8)
+my_CircosPlot(xx_bl, 
+              weight.attribute = 'weight_norm',
+              cols.use = cell_color,
+              sources.include = cells.of.interest,
+              targets.include = cells.of.interest,
+              lab.cex = 0.5,
+              title = paste('LR manually selected'))
+
+dev.off()
+
+
+write.csv(res, file = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all.csv'), 
+          row.names = TRUE, quote = FALSE)
+
+res = res[!is.na(match(res$ligand, secreted_ligands)), ]
+
+write.csv(xx, file = paste0(outDir, '/LR_interactions_LIANA_tops_BL_secretedLigandsFiltered.csv'), 
+          row.names = TRUE, quote = FALSE)
+
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_secretedLigandsFiltered_v3.pdf')
 pdf(pdfname, width=12, height = 8)
 for(ntop in c(100, 200, 300))
 {
@@ -895,7 +935,35 @@ names(cell_color) <- c("mac_CSD_early", "neu_CSD_early",  "CT_CSD_early", "epide
 # CT_ CSD_early_3 #61394f
 # Epidermis_BL.CSD_early #3200F5
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_v2.pdf')
+ligands_CSD = manual_ligands$gene[which(manual_ligands$`BL or CSD` == 'CSD')]
+ligands_CSD = ligands_CSD[!is.na(ligands_CSD)]
+mm = match(ligands_CSD, res$ligand)
+
+xx_csd = res[!is.na(match(res$ligand, ligands_CSD)), ]
+
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_manualSelectedLigands_v4.pdf')
+pdf(pdfname, width=12, height = 8)
+my_CircosPlot(xx_csd, 
+              weight.attribute = 'weight_norm',
+              cols.use = cell_color,
+              sources.include = cells.of.interest,
+              targets.include = cells.of.interest,
+              lab.cex = 0.5,
+              title = paste('LR manually selected'))
+
+dev.off()
+
+
+write.csv(res, file = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all.csv'), 
+          row.names = TRUE, quote = FALSE)
+
+res = res[!is.na(match(res$ligand, secreted_ligands)), ]
+
+write.csv(res, file = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_secretedLigandsFiltered.csv'), 
+          row.names = TRUE, quote = FALSE)
+
+
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_secretedLigandsFiltered_v3.pdf')
 pdf(pdfname, width=12, height = 8)
 
 for(ntop in c(100, 200, 300))
@@ -1082,41 +1150,7 @@ test_bl$pct_receptor = 2^test_bl$logPct_receptor
 test_bl$es = test_bl$logFC_ligand + test_bl$logFC_receptor + test_bl$logPct_ligand + test_bl$logPct_receptor
 test_bl = test_bl[order(-test_bl$es), ]
 
-cells.of.interest = unique(c(test_bl$source, test_bl$target))
-print(cells.of.interest)
-
-cell_color = c("#2AD0B7", "#98B304", "#16005e", "#005e45", "#3200F5")
-names(cell_color) <- c("mac_BL_early", "neu_BL_early", "epidermis_BL_early",
-                       "CT_BL_early", "epidermis_BL.CSD_early")
-cell_color = cell_color[match(cells.of.interest, names(cell_color))]
-
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_specific_v2.pdf')
-pdf(pdfname, width=12, height = 8)
-for(es_cut in seq(1, 4, by = 1))
-{
-  # es_cut = 
-  test = test_bl[which(test_bl$es > es_cut), ]
-  cat('Es cutoff  -- ', es_cut, '--', nrow(test), ' LR \n')
-  
-  jj = which(test$ligand == 'RGMB'|test$receptor == 'RGMB'|
-               test$ligand == "FGFR3")
-  if(length(jj) >0){
-    test = test[-jj, ]
-  }
-  
-  #test = test[-which(test$ligand == 'SPON1'), ] 
-  
-  my_CircosPlot(test, 
-                weight.attribute = 'weight_norm',
-                cols.use = cell_color,
-                sources.include = cells.of.interest,
-                targets.include = cells.of.interest,
-                lab.cex = 0.5,
-                title = paste('ES cutoff :', es_cut))
-  
-}
-dev.off()
-
+saveRDS(test_bl, file = paste0(outDir, '/test_BL_all.rds'))
 
 ### compute the enrichment score (ES) for CSD
 test_csd$logFC_ligand = NA
@@ -1182,13 +1216,60 @@ test_csd$es = test_csd$logFC_ligand + test_csd$logFC_receptor +
   test_csd$logPct_ligand + test_csd$logPct_receptor
 test_csd = test_csd[order(-test_csd$es), ]
 
+##########################################
+# ## plot part of BL-specific/CSD-specific LRs
+##########################################
+test_bl = readRDS(file = paste0(outDir, '/test_BL_all.rds'))
+
+cells.of.interest = unique(c(test_bl$source, test_bl$target))
+print(cells.of.interest)
+
+cell_color = c("#2AD0B7", "#98B304", "#16005e", "#005e45", "#3200F5")
+names(cell_color) <- c("mac_BL_early", "neu_BL_early", "epidermis_BL_early",
+                       "CT_BL_early", "epidermis_BL.CSD_early")
+cell_color = cell_color[match(cells.of.interest, names(cell_color))]
+
+test_bl = test_bl[which(!is.na(match(test_bl$ligand, secreted_ligands))), ]
+
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_specific_secretedLigandsFiltered_v3.pdf')
+pdf(pdfname, width=12, height = 8)
+for(es_cut in seq(1, 4, by = 1))
+{
+  # es_cut = 
+  test = test_bl[which(test_bl$es > es_cut), ]
+  cat('Es cutoff  -- ', es_cut, '--', nrow(test), ' LR \n')
+  
+  jj = which(test$ligand == 'RGMB'|test$receptor == 'RGMB'|
+               test$ligand == "FGFR3")
+  if(length(jj) >0){
+    test = test[-jj, ]
+  }
+  
+  #test = test[-which(test$ligand == 'SPON1'), ] 
+  
+  my_CircosPlot(test, 
+                weight.attribute = 'weight_norm',
+                cols.use = cell_color,
+                sources.include = cells.of.interest,
+                targets.include = cells.of.interest,
+                lab.cex = 0.5,
+                title = paste('ES cutoff :', es_cut))
+  
+}
+dev.off()
+
+
 cells.of.interest = unique(c(test_csd$source, test_csd$target))
 print(cells.of.interest)
 cell_color = c("#2AD0B7", "#98B304", "#d693b8", "#3200F5")
 names(cell_color) <- c("mac_CSD_early", "neu_CSD_early",  "CT_CSD_early", "epidermis_BL.CSD_early")
 
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops200_CSD_specific.pdf')
+saveRDS(test_csd, file = paste0(outDir, '/test_CSD_all.rds'))
+
+test_csd = test_csd[which(!is.na(match(test_csd$ligand, secreted_ligands))), ]
+
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops200_CSD_specific_secretedLiangFiltered_v3.pdf')
 pdf(pdfname, width=12, height = 8)
 for(es_cut in seq(1, 4, by = 1))
 {
@@ -1217,6 +1298,9 @@ for(es_cut in seq(1, 4, by = 1))
 }
 
 dev.off()
+
+
+
 
 
 ##########################################
