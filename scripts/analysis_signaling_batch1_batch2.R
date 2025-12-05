@@ -83,9 +83,11 @@ tfs = unique(tfs$`HGNC symbol`)
 aa = readRDS(file = paste0(dataDir, 'BL_SeuratObj.RDS'))
 #xx = readRDS(file = paste0("../fromTobie/CSD_batch1/", 'BL_SeuratObj.RDS'))
 
+aa$batch = aa$exp
+
+
 bb = readRDS(file = paste0(dataDir, 'CSD_SeuratObj.RDS'))
 
-aa$batch = aa$exp
 bb$batch = bb$exp
 
 p1 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE)
@@ -125,7 +127,8 @@ saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_twoBacthes_merged.rds'))
 # 
 ########################################################
 ########################################################
-aa = readRDS(file = paste0(RdataDir, '/BL.CSD_twoBacthes_merged.rds'))
+aa = readRDS(file = paste0("../results/scRNAseq_signaling.analysis_axolotl_20240116/Rdata", 
+                           '/BL.CSD_twoBacthes_merged.rds'))
 
 aa = NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
 aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000) # find subset-specific HVGs
@@ -999,7 +1002,7 @@ dev.off()
 
 
 ##########################################
-# circosPlot for BL and CSD-specific LR
+# calculate BL and CSD-specific scores for LR
 ##########################################
 res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
 
@@ -1019,9 +1022,15 @@ res_BL = res_BL[order(res_BL$aggregate_rank), ]
 
 head(grep('WNT', res_BL$ligand))
 
+ligands_BL = manual_ligands$gene[which(manual_ligands$`BL or CSD` == 'BL')]
+mm = match(ligands_BL, res_BL$ligand)
+
 ntop = 200
 cat('top LR -- ', ntop, '\n')
-test = res_BL[c(1:ntop), ]
+mm = match(res_BL$ligand, ligands_BL)
+kk = which(!is.na(mm))
+sels = unique(c(1:ntop, kk))
+test = res_BL[sels, ]
 
 jj = which(test$ligand == 'RGMB'|test$receptor == 'RGMB'|
              test$ligand == "FGFR3")
@@ -1029,8 +1038,7 @@ if(length(jj) >0){
   test = test[-jj, ]
 }
 
-saveRDS(test, file = paste0(outDir, '/res_lianaTest_for_circosplot_BL_ntop200.rds'))
-
+saveRDS(test, file = paste0(outDir, '/res_lianaTest_for_circosplot_BL_ntop200_manual.rds'))
 
 res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
 sender_cells = celltypes[grep('CSD', celltypes)]
@@ -1044,9 +1052,16 @@ res = res[!is.na(match(res$source, sender_cells)) & !is.na(match(res$target, rec
 res = res[order(res$aggregate_rank), ]
 head(grep('WNT', res$ligand))
 
+ligands_CSD = manual_ligands$gene[which(manual_ligands$`BL or CSD` == 'CSD')]
+ligands_CSD = ligands_CSD[!is.na(ligands_CSD)]
+mm = match(ligands_CSD, res$ligand)
+
 ntop = 200
 cat('top LR -- ', ntop, '\n')
-test = res[c(1:ntop), ]
+mm = match(res$ligand, ligands_CSD)
+kk = which(!is.na(mm))
+sels = unique(c(1:ntop, kk))
+test = res[sels, ]
 
 jj = which(test$ligand == 'RGMB'|test$receptor == 'RGMB'|
              test$ligand == 'APP' | test$ligand == 'APP')
@@ -1054,14 +1069,14 @@ jj = which(test$ligand == 'RGMB'|test$receptor == 'RGMB'|
 if(length(jj)>0){
   test = test[-jj, ]
 }
-saveRDS(test, file = paste0(outDir, '/res_lianaTest_for_circosplot_CSD_ntop200.rds'))
+saveRDS(test, file = paste0(outDir, '/res_lianaTest_for_circosplot_CSD_ntop200_manual.rds'))
 
 
 Idents(aa) = as.factor(aa$celltypes)
 source(paste0(functionDir, '/functions_cccInference.R'))
 
-test_bl = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot_BL_ntop200.rds'))
-test_csd = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot_CSD_ntop200.rds'))
+test_bl = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot_BL_ntop200_manual.rds'))
+test_csd = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot_CSD_ntop200_manual.rds'))
 
 ggs = unique(c(test_bl$ligand, test_bl$receptor, test_csd$ligand, test_csd$receptor))
 xx = c()
@@ -1150,7 +1165,7 @@ test_bl$pct_receptor = 2^test_bl$logPct_receptor
 test_bl$es = test_bl$logFC_ligand + test_bl$logFC_receptor + test_bl$logPct_ligand + test_bl$logPct_receptor
 test_bl = test_bl[order(-test_bl$es), ]
 
-saveRDS(test_bl, file = paste0(outDir, '/test_BL_all.rds'))
+saveRDS(test_bl, file = paste0(outDir, '/test_BL_all_top200_manual.rds'))
 
 ### compute the enrichment score (ES) for CSD
 test_csd$logFC_ligand = NA
@@ -1215,11 +1230,14 @@ test_csd$pct_receptor = 2^test_csd$logPct_receptor
 test_csd$es = test_csd$logFC_ligand + test_csd$logFC_receptor + 
   test_csd$logPct_ligand + test_csd$logPct_receptor
 test_csd = test_csd[order(-test_csd$es), ]
+saveRDS(test_csd, file = paste0(outDir, '/test_CSD_all_ntop200_manual.rds'))
 
 ##########################################
 # ## plot part of BL-specific/CSD-specific LRs
 ##########################################
 test_bl = readRDS(file = paste0(outDir, '/test_BL_all.rds'))
+write.csv(test_bl, file = paste0(outDir, '/LR_interactions_LIANA_BLspecific_all.csv'), 
+          row.names = TRUE, quote = FALSE)
 
 cells.of.interest = unique(c(test_bl$source, test_bl$target))
 print(cells.of.interest)
@@ -1231,22 +1249,38 @@ cell_color = cell_color[match(cells.of.interest, names(cell_color))]
 
 test_bl = test_bl[which(!is.na(match(test_bl$ligand, secreted_ligands))), ]
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_specific_secretedLigandsFiltered_v3.pdf')
+#ligands_BL = manual_ligands$gene[which(manual_ligands$`BL or CSD` == 'BL')]
+#mm = match(ligands_BL, test_bl$ligand)
+
+kk = grep('COL|FN1|LAM', test_bl$ligand, invert = TRUE)
+test_bl = test_bl[kk, ]
+
+write.csv(test_bl, file = paste0(outDir, 
+                                 '/LR_interactions_LIANA_BLspecific_secretedLigands_ColFnLamFiltered.csv'),
+          row.names = TRUE, quote = FALSE)
+
+ggs = unique(test_bl$ligand)
+exprs = AggregateExpression(aa, assays = 'RNA', group.by = 'celltypes', features = ggs, 
+                            normalization.method = "LogNormalize",
+                            scale.factor = 10000)
+exprs = data.frame(log2(exprs$RNA + 1))
+
+
+
+pdfname = paste0(outDir, 
+                 '/LR_interactions_LIANA_tops_BL_specific_DotPlot_secretedLigands_ColFnLamFiltered_v3.pdf')
 pdf(pdfname, width=12, height = 8)
-for(es_cut in seq(1, 4, by = 1))
+for(es_cut in seq(1, 3, by = 1))
 {
-  # es_cut = 
+  # es_cut = 2
   test = test_bl[which(test_bl$es > es_cut), ]
   cat('Es cutoff  -- ', es_cut, '--', nrow(test), ' LR \n')
   
   jj = which(test$ligand == 'RGMB'|test$receptor == 'RGMB'|
                test$ligand == "FGFR3")
-  if(length(jj) >0){
-    test = test[-jj, ]
-  }
+  if(length(jj) >0){ test = test[-jj, ] }
   
   #test = test[-which(test$ligand == 'SPON1'), ] 
-  
   my_CircosPlot(test, 
                 weight.attribute = 'weight_norm',
                 cols.use = cell_color,
@@ -1255,8 +1289,92 @@ for(es_cut in seq(1, 4, by = 1))
                 lab.cex = 0.5,
                 title = paste('ES cutoff :', es_cut))
   
+  ## dotplot of LR
+  source_cells = unique(test$source)
+  target_cells = unique(test$target)
+  
+  exprs_test = exprs[match(unique(test$ligand), rownames(exprs)), match(source_cells, colnames(exprs))]
+  
+  stats = matrix(0, nrow = nrow(exprs_test), ncol = ncol(exprs_test))
+  rownames(stats) = rownames(exprs_test)
+  colnames(stats) = colnames(exprs_test)
+  for(i in 1:nrow(stats))
+  {
+    for(j in 1:ncol(stats))
+    {
+      kk = which(test$source == colnames(stats)[j] & test$ligand == rownames(stats)[i])
+      if(length(kk)>0) stats[i, j] = median(test$sca.LRscore[kk])
+    }
+  }
+  
+  exprs_test$gene = rownames(exprs_test)
+  
+  # reshaping the correlations
+  plot_df = reshape2::melt(exprs_test, id.vars = 'gene')
+  colnames(plot_df)[2:3] = c('source', 'expression')
+  
+  #plot_df$Var1 = factor(plot_df$Var1, levels = rev(hcr))
+  #plot_df$Var2 = factor(plot_df$Var2, levels = hcc)
+  
+  # add pvalue and max cor infor
+  xx = reshape2::melt(stats)
+  plot_df$stats = xx$value
+  
+  
+  # getting a colourscale where 0 is white in the middle, and intensity leveled by max(abs(value))
+  cols = colorRampPalette(c(rev(RColorBrewer::brewer.pal(9, "Blues")),
+                            RColorBrewer::brewer.pal(9, "Reds")))(101)
+  #cols = colorRampPalette(c(RColorBrewer::brewer.pal(9, "Reds")))(101)
+  #br = seq((min(cort$r)), max(abs(cort$r)), length.out = 101)
+  #cols = cols[!(br>max(cort$r) | br<min(cort$r))]
+  plot_df = data.frame(plot_df)
+  #colnames(plot_df)[c(3:5)] = c('ligand', 'source2', 'stats')
+  
+  plot_df$stats[which(plot_df$stats < 0.25)] = NA
+  
+  p1 = ggplot() +
+    geom_point(data = plot_df, mapping = aes(x = source, y = gene, fill = expression, 
+                                             size = stats), 
+               shape = 21) +
+    #geom_point(data = plot_df[plot_df$rowmax,], mapping = aes(x = Var2, y = Var1, size = 30), 
+    #           shape = "—", show.legend = F, colour = "grey10")+
+    #geom_point(data = plot_df[plot_df$colmax,], mapping = aes(x = Var2, y = Var1, size = 30), 
+    #           shape = "|", show.legend = F, colour = "grey10")+
+    #scale_x_discrete(expand = c(0,0.7)) +
+    #scale_y_discrete(expand = c(0,0.7)) +
+    scale_fill_viridis_c() + 
+    scale_size(range= c(0, 6),
+               breaks = c(0.25, 0.5, 0.75, 1),
+               labels = c("0.25", "0.5", "0.75", "1.0"),
+               guide = "legend",
+               limits = c(0.1, 1)
+               #oob = scales::squish
+    ) +
+  
+    #scale_fill_viridis_c(option = "magma") + 
+    #scale_fill_gradientn(#values = scales::rescale(c(min(br), 0, max(br))),
+    #                     colours = cols) +
+    labs(x = '', y = 'Ligand')+
+    theme_bw()+
+    theme(axis.title = element_text(colour = "black", face = "bold"),
+          axis.text = element_text(colour = "black"),
+          axis.text.x = element_text(size = 10,  angle = 0, hjust = 0.5, vjust = 0),
+          legend.title = element_text(size = 9),
+          legend.text = element_text(size = 8))
+  
+  plot(p1)
+  #ggsave(paste0(resDir, "axolotl_nm_subtype_correlationAnalysis.pdf"), width=8, height=6, dpi=300)
+  
 }
+
 dev.off()
+
+
+
+test_csd = readRDS(file = paste0(outDir, '/test_CSD_all.rds'))
+
+write.csv(test_bl, file = paste0(outDir, '/LR_interactions_LIANA_CSDspecific_all.csv'), 
+          row.names = TRUE, quote = FALSE)
 
 
 cells.of.interest = unique(c(test_csd$source, test_csd$target))
@@ -1264,14 +1382,25 @@ print(cells.of.interest)
 cell_color = c("#2AD0B7", "#98B304", "#d693b8", "#3200F5")
 names(cell_color) <- c("mac_CSD_early", "neu_CSD_early",  "CT_CSD_early", "epidermis_BL.CSD_early")
 
-
-saveRDS(test_csd, file = paste0(outDir, '/test_CSD_all.rds'))
-
 test_csd = test_csd[which(!is.na(match(test_csd$ligand, secreted_ligands))), ]
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops200_CSD_specific_secretedLiangFiltered_v3.pdf')
+kk = grep('COL|FN1|LAM', test_csd$ligand, invert = TRUE)
+test_csd = test_csd[kk, ]
+
+write.csv(test_csd, file = paste0(outDir, 
+                                 '/LR_interactions_LIANA_CSDspecific_secretedLigands_ColFnLamFiltered.csv'),
+          row.names = TRUE, quote = FALSE)
+
+ggs = unique(test_csd$ligand)
+exprs = AggregateExpression(aa, assays = 'RNA', group.by = 'celltypes', features = ggs, 
+                            normalization.method = "LogNormalize",
+                            scale.factor = 10000)
+exprs = data.frame(log2(exprs$RNA + 1))
+
+pdfname = paste0(outDir, 
+                 '/LR_interactions_LIANA_tops_CSD_specific_DotPlot_secretedLigands_ColFnLamFiltered_v3.pdf')
 pdf(pdfname, width=12, height = 8)
-for(es_cut in seq(1, 4, by = 1))
+for(es_cut in seq(1, 3, by = 1))
 {
   # es_cut = 
   test = test_csd[which(test_csd$es > es_cut), ]
@@ -1295,238 +1424,75 @@ for(es_cut in seq(1, 4, by = 1))
                 lab.cex = 0.5,
                 title = paste('ES cutoff :', es_cut))
   
+  ## dotplot of LR
+  source_cells = unique(test$source)
+  target_cells = unique(test$target)
+  
+  exprs_test = exprs[match(unique(test$ligand), rownames(exprs)), match(source_cells, colnames(exprs))]
+  
+  stats = matrix(0, nrow = nrow(exprs_test), ncol = ncol(exprs_test))
+  rownames(stats) = rownames(exprs_test)
+  colnames(stats) = colnames(exprs_test)
+  for(i in 1:nrow(stats))
+  {
+    for(j in 1:ncol(stats))
+    {
+      kk = which(test$source == colnames(stats)[j] & test$ligand == rownames(stats)[i])
+      if(length(kk)>0) stats[i, j] = median(test$sca.LRscore[kk])
+    }
+  }
+  
+  exprs_test$gene = rownames(exprs_test)
+  
+  # reshaping the correlations
+  plot_df = reshape2::melt(exprs_test, id.vars = 'gene')
+  colnames(plot_df)[2:3] = c('source', 'expression')
+  
+  #plot_df$Var1 = factor(plot_df$Var1, levels = rev(hcr))
+  #plot_df$Var2 = factor(plot_df$Var2, levels = hcc)
+  
+  # add pvalue and max cor infor
+  xx = reshape2::melt(stats)
+  plot_df$stats = xx$value
+  
+  
+  # getting a colourscale where 0 is white in the middle, and intensity leveled by max(abs(value))
+  cols = colorRampPalette(c(rev(RColorBrewer::brewer.pal(9, "Blues")),
+                            RColorBrewer::brewer.pal(9, "Reds")))(101)
+  #cols = colorRampPalette(c(RColorBrewer::brewer.pal(9, "Reds")))(101)
+  #br = seq((min(cort$r)), max(abs(cort$r)), length.out = 101)
+  #cols = cols[!(br>max(cort$r) | br<min(cort$r))]
+  plot_df = data.frame(plot_df)
+  #colnames(plot_df)[c(3:5)] = c('ligand', 'source2', 'stats')
+  
+  plot_df$stats[which(plot_df$stats < 0.25)] = NA
+  
+  p1 = ggplot() +
+    geom_point(data = plot_df, mapping = aes(x = source, y = gene, fill = expression, 
+                                             size = stats), 
+               shape = 21) +
+    #geom_point(data = plot_df[plot_df$rowmax,], mapping = aes(x = Var2, y = Var1, size = 30), 
+    #           shape = "—", show.legend = F, colour = "grey10")+
+    #geom_point(data = plot_df[plot_df$colmax,], mapping = aes(x = Var2, y = Var1, size = 30), 
+    #           shape = "|", show.legend = F, colour = "grey10")+
+    #scale_x_discrete(expand = c(0,0.7)) +
+    #scale_y_discrete(expand = c(0,0.7)) +
+    scale_fill_viridis_c() + 
+    #scale_fill_viridis_c(option = "magma") + 
+    #scale_fill_gradientn(#values = scales::rescale(c(min(br), 0, max(br))),
+    #                     colours = cols) +
+    labs(x = '', y = 'Ligand')+
+    theme_bw()+
+    theme(axis.title = element_text(colour = "black", face = "bold"),
+          axis.text = element_text(colour = "black"),
+          axis.text.x = element_text(size = 10,  angle = 0, hjust = 0.5, vjust = 0),
+          legend.title = element_text(size = 9),
+          legend.text = element_text(size = 8))
+  
+  plot(p1)
+  
+  
 }
 
 dev.off()
 
-
-
-
-
-##########################################
-##########################################
-# Test NicheNet 
-##########################################
-##########################################
-aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
-
-## manually merge subclusters
-aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_2')] = 'epidermis_BL_early'
-aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_1')] = 'epidermis_BL_early'
-aa$subtypes[which(aa$subtypes == 'CT_BL_early_2')] = 'CT_BL_early_1'
-
-## shorten the subtype names
-aa$subtypes[which(aa$subtypes == 'epidermis_BL_early')] = 'epidermis_BL'
-aa$subtypes[which(aa$subtypes == 'epidermis_BL.CSD_early')] = 'epidermis_BL.CSD'
-aa$subtypes[which(aa$subtypes == 'mac_BL_early')] = 'mac_BL'
-aa$subtypes[which(aa$subtypes == 'mac_CSD_early')] = 'mac_CSD'
-aa$subtypes[which(aa$subtypes == 'neu_BL_early')] = 'neu_BL'
-aa$subtypes[which(aa$subtypes == 'neu_CSD_early')] = 'neu_CSD'
-
-aa$subtypes[which(aa$subtypes == 'CT_BL_early_1')] = 'CT_BL'
-aa$subtypes[which(aa$subtypes == 'CT_CSD_early_1')] = 'CT_CSD'
-
-DimPlot(aa, group.by = 'subtypes')
-
-aa$subtypes = factor(aa$subtypes, levels = sort(unique(aa$subtypes)))
-
-aa = ScaleData(aa, features = rownames(aa))
-
-Idents(aa) = aa$subtypes
-
-
-## test NicheNet
-outDir = paste0(resDir, '/LR_analysis_NicheNet_v1')
-source("functions_ligandReceptor_analysis.R")
-
-
-########################################################
-########################################################
-# Section III: native way of checking gene examples of pathways of interest
-# (RA, WNT, BMP, TGF-beta, FGF, Noch, Yap, SHH, PI3K)
-########################################################
-########################################################
-
-##########################################
-# plot gene examples of selected signaling pathways
-##########################################
-curate.geneList.signalingPathways = FALSE
-if(curate.geneList.signalingPathways){
-  sps = readRDS(file = paste0('../data/annotations/curated_signaling.pathways_gene.list_v2.rds'))
-  #sps = unique(sps$gene)
-  xx = read.table('../data/annotations/GO_term_summary_RAR_signalingPathway.txt', header = TRUE, sep = '\t', 
-                  row.names = NULL)
-  xx = unique(xx[,2])
-  xx = data.frame(gene = xx, pathway = rep('RA', length(xx)))
-  sps = rbind(sps, xx)
-  
-  
-  xx = read.table('../data/annotations/GO_term_summary_TGFb.txt', header = TRUE, sep = '\t', 
-                  row.names = NULL)
-  xx = unique(xx[,2])
-  xx = data.frame(gene = xx, pathway = rep('TGF_beta', length(xx)))
-  sps = rbind(sps, xx)
-  
-  xx = read.table('../data/annotations/GO_term_summary_NOTCH.txt', header = TRUE, sep = '\t', 
-                  row.names = NULL)
-  xx = unique(xx[,2])
-  xx = data.frame(gene = xx, pathway = rep('NOTCH', length(xx)))
-  sps = rbind(sps, xx)
-  
-  xx = read.table('../data/annotations/GO_term_summary_PI3K.txt', header = TRUE, sep = '\t', 
-                  row.names = NULL)
-  xx = unique(xx[,2])
-  xx = data.frame(gene = xx, pathway = rep('PI3K', length(xx)))
-  sps = rbind(sps, xx)
-  
-  xx = read.table('../data/annotations/GO_term_summary_Hippo.txt', header = TRUE, sep = '\t', 
-                  row.names = NULL)
-  xx = unique(xx[,2])
-  xx = data.frame(gene = xx, pathway = rep('Hippo', length(xx)))
-  sps = rbind(sps, xx)
-  
-  saveRDS(sps, file = paste0('../data/annotations/curated_signaling.pathways_gene.list_v3.rds'))
-  
-  
-}
-
-
-saveDir = paste0(resDir, '/geneExamples_pathways/')
-system(paste0('mkdir -p ', saveDir))
-
-DefaultAssay(aa) = 'RNA'
-
-cell_ids  = 'groups'
-
-## gene example of signaling pathways 
-sps = readRDS(file = paste0("/groups/tanaka/People/current/jiwang/projects/RA_competence/",
-                            '/data/annotations/curated_signaling.pathways_gene.list_v3.rds'))
-sps = unique(sps$gene)
-sps = toupper(sps)
-
-## TFs 
-tfs = readRDS(file = paste0('/groups/tanaka/People/current/jiwang/projects/RA_competence/data',
-                            '/annotations/curated_human_TFs_Lambert.rds'))
-tfs = unique(tfs$`HGNC symbol`)
-#tfs = as.character(unlist(sapply(tfs, firstup)))
-
-## ligands and receptors from NicheNet
-dataPath_nichenet = '/users/jingkui.wang/projects/heart_regeneration/data/NicheNet/'
-
-ligand_target_matrix = readRDS(paste0(dataPath_nichenet,  "ligand_target_matrix.rds"))
-ligand_target_matrix[1:5,1:5] # target genes in rows, ligands in columns
-
-# ligand-receptor network, Putative ligand-receptor links from NicheNet
-lr_network = readRDS(paste0(dataPath_nichenet, "lr_network.rds"))
-lr_network = lr_network %>% mutate(bonafide = ! database %in% c("ppi_prediction","ppi_prediction_go"))
-lr_network = lr_network %>% dplyr::rename(ligand = from, receptor = to) %>% 
-  distinct(ligand, receptor, bonafide)
-
-head(lr_network)
-
-ligands = lr_network %>% pull(ligand) %>% unique()
-receptors = lr_network %>% pull(receptor) %>% unique()
-
-
-##########################################
-# manual subtyping early BL and CSD clusters
-##########################################
-markers_saved = c()
-
-aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
-aa$subtypes = factor(aa$subtypes, levels = sort(unique(aa$subtypes)))
-
-aa = ScaleData(aa, features = rownames(aa))
-Idents(aa) = aa$subtypes
-
-DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
-
-markers = FindAllMarkers(aa, only.pos = TRUE,  
-                         #min.pct = 0.25, 
-                         logfc.threshold = 0.25)
-
-markers_saved = unique(c(markers_saved, markers$gene))
-
-
-## call marker genes
-cell_ids = 'manual_subtyping'
-
-markers %>%
-  group_by(cluster) %>%
-  top_n(n = 20, wt = avg_log2FC) -> top10
-
-DoHeatmap(aa, features = top10$gene) + NoLegend()
-ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_top20_by_', cell_ids, '.pdf'), 
-       width = 12, height = 30)
-
-features = intersect(markers$gene[which(markers$p_val < 10^-100)], sps)
-cat(length(features), ' genes to display \n')
-
-DoHeatmap(aa, features = features) + NoLegend()
-ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_signalingGenes_by_', cell_ids, '.pdf'), 
-       width = 12, height = 40)
-
-tfs_sel = intersect(tfs, markers$gene[which(markers$p_val < 10^-50)])
-
-DoHeatmap(aa, features = tfs_sel) + NoLegend()
-ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_TFs_by_', cell_ids, '.pdf'), 
-       width = 12, height = 30)
-
-
-features = intersect(markers$gene[which(markers$p_val < 10^-100)], receptors)
-cat(length(features), ' genes to display \n')
-
-DoHeatmap(aa, features = features) + NoLegend()
-ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_receptors_by_', cell_ids, '.pdf'), 
-       width = 12, height = 40)
-
-features = intersect(markers$gene[which(markers$p_val < 10^-100)], ligands)
-cat(length(features), ' genes to display \n')
-
-DoHeatmap(aa, features = features) + NoLegend()
-ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_ligands_by_', cell_ids, '.pdf'), 
-       width = 12, height = 40)
-
-
-genes = unique(c(sps, tfs, ligands, receptors))
-genes = genes[!is.na(match(genes, rownames(aa)))]
-genes = intersect(genes, markers$gene[which(markers$p_val < 10^-50)])
-
-aa$condition = droplevels(aa$condition)
-#cols[2:4] = colorRampPalette((brewer.pal(n = 3, name ="Blues")))(3)
-#cols[5:8] = colorRampPalette((brewer.pal(n = 4, name ="OrRd")))(4)
-
-cols_sel = c("#9ECAE1", "#3182BD", 
-             colorRampPalette((brewer.pal(n = 3, name ="OrRd")))(3))
-DimPlot(aa, group.by = 'condition', cols = cols_sel)
-
-p1 = DimPlot(aa, group.by = 'condition', cols = cols_sel, label = TRUE, repel = TRUE)
-p2 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE) + NoLegend()
-p2 + p1
-
-ggsave(filename = paste0(resDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_conditions.pdf'), 
-       width = 12, height = 6)
-
-# feature plots
-pdfname = paste0(saveDir, "gene_examples_sps_tfs_ligands_receptors_v2.pdf")
-pdf(pdfname, width=16, height = 8)
-par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-
-#for(n in 1:20)
-for(n in 1:length(genes))
-{
-  # n = 1
-  gg = genes[n];
-  # gg = "Foxa2"
-  cat(n, '--', gg, '\n')
-
-  p1 = FeaturePlot(aa, features = gg)
-  p2 = VlnPlot(aa, features = gg, group.by = 'subtypes', pt.size = 0.01)  + NoLegend()
-    #scale_fill_manual(values=c("blue", 'green', "red",  "blue",
-    #                           'red', 'green', 'blue', 'green', 'red', 'green', 'green'))
-  #p3 = VlnPlot(aa, features = gg, group.by = 'clusters', pt.size = 0.01) + NoLegend()
-  plot(p1 | p2)
-
-}
-
-dev.off()
