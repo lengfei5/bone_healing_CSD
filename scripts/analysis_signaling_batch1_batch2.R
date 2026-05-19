@@ -84,6 +84,19 @@ aa = readRDS(file = paste0(dataDir, 'BL_SeuratObj.RDS'))
 #xx = readRDS(file = paste0("../fromTobie/CSD_batch1/", 'BL_SeuratObj.RDS'))
 
 aa$batch = aa$exp
+aa$time = paste0('dpa', aa$time)
+aa$time = factor(aa$time, levels = c('dpa3', 'dpa5', 'dpa6', 'dpa7', 'dpa8', 'dpa11'))
+
+aa$condition = aa$orig.ident
+aa$condition[which(aa$condition == 'BL_3_5dpa')] = 'BL_3and5dpa'
+
+aa$sample = aa$condition
+aa$days = aa$condition
+aa$days = gsub('BL_', '', aa$days)
+
+genes = c(rownames(aa)[grep('RUNX1|CBFB|ZEB1|SNAI', rownames(aa))])
+
+FeaturePlot(subs, features = genes)
 
 
 bb = readRDS(file = paste0(dataDir, 'CSD_SeuratObj.RDS'))
