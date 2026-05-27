@@ -285,7 +285,7 @@ ggsave(filename = paste0(resDir,
 saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds'))
 
 ##########################################
-# double check Tobi's CT filtering  
+# double check Tobi's CT filtering
 ##########################################
 Test_Tobi_CT_filtering_steps = FALSE
 if(Test_Tobi_CT_filtering_steps){
@@ -624,8 +624,9 @@ aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5
 #dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20240116/Rdata/'
 #aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds'))
 
-outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes')
+outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes_immuneCells')
 additionalLabel = '_fixedCelltypes'
+
 
 aa$condition = droplevels(aa$condition)
 
