@@ -87,7 +87,7 @@ dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20230308/Rdata/'
 aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
 
 ##############################
-# test LIANA for all pairs
+# prepare the cell annotations
 ##########################################
 #dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20240116/Rdata/'
 #aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds'))
@@ -111,7 +111,6 @@ aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_2')] = 'epidermis_BL_early'
 aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_1')] = 'epidermis_BL_early'
 aa$subtypes[which(aa$subtypes == 'CT_BL_early_2')] = 'CT_BL_early_1'
 
-
 DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
 
 ggsave(filename = paste0(outDir,  '/UMAP_subtypes.pdf'), 
@@ -124,72 +123,6 @@ p1 + p2
 
 ggsave(filename = paste0(outDir,  '/UMAP_condition_celltype.pdf'),
        width = 16, height = 6)
-
-Subset_epidermis = FALSE
-if(Subset_epidermis){
-  celltype2subset = 'epidermis'
-  
-  cells = colnames(aa)[which(aa$celltype == celltype2subset)]
-  sub.obj = subset(aa, cells = cells) 
-  
-  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 3000)
-  sub.obj = ScaleData(sub.obj)
-  sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
-  ElbowPlot(sub.obj, ndims = 30)
-  
-  nb.pcs = 30 # nb of pcs depends on the considered clusters or ids
-  n.neighbors = 30; min.dist = 0.3;
-  sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", 
-                     dims = 1:nb.pcs, 
-                     n.neighbors = n.neighbors,
-                     min.dist = min.dist)
-  
-  sub.obj$condition = droplevels(sub.obj$condition)
-  sub.obj$subtypes[which(sub.obj$condition == 'CSD_3dpa')] = 'epidermis_BL.CSD_early'
-  
-  
-  p1 = DimPlot(sub.obj, group.by = 'condition', label = TRUE, repel = TRUE)
-  p2 = DimPlot(sub.obj, group.by = 'subtypes', label = TRUE, repel = TRUE)
-  
-  p1 + p2
-  
-  
-  ggsave(filename = paste0(outDir, celltype2subset, '_condtion_subtype.pdf'), 
-         width = 16, height = 8)
-  
-  sub.obj <- FindNeighbors(sub.obj, dims = 1:20,  k.param = 30)
-  sub.obj <- FindClusters(sub.obj, resolution = 0.3)
-  
-  p1 = DimPlot(sub.obj, label = TRUE, repel = TRUE)
-  p2 = DimPlot(sub.obj, group.by = 'groups', label = TRUE, repel = TRUE)
-  
-  p1 | p2
-  
-  saveRDS(sub.obj, file = paste0(RdataDir, '/Early_subset_epidermis.rds'))
-  
-  
-  ggsave(filename = paste0(outDir, celltype2subset, '_groups_subclustering.pdf'), 
-         width = 14, height = 6)
-  
-  ## assign new labels
-  sub.obj$subtypes = NA
-  sub.obj$subtypes[which(sub.obj$seurat_clusters == '2'| sub.obj$seurat_clusters == '3'|
-                           sub.obj$seurat_clusters == '4')] = 'epidermis_BL.CSD_early'
-  
-  sub.obj$subtypes[which(sub.obj$seurat_clusters == '0')] = 'epidermis_BL_early_1'
-  sub.obj$subtypes[which(sub.obj$seurat_clusters == '1')] = 'epidermis_BL_early_2'
-  
-  DimPlot(sub.obj, group.by = 'subtypes', label = TRUE, repel = TRUE)
-  
-  ggsave(filename = paste0(outDir, celltype2subset, '_groups_subclustering_manual_labels.pdf'), 
-         width = 8, height = 6) 
-  
-  aa$subtypes[match(colnames(sub.obj), colnames(aa))] = sub.obj$subtypes
-  DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
-  
-  
-  
-}
 
 
 ## manually merge again the CT
@@ -215,21 +148,21 @@ Idents(aa) = aa$subtypes
 source("functions_ligandReceptor_analysis.R")
 aa$celltypes = aa$subtypes
 
-saveRDS(aa, file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_MergedCT.rds'))
+saveRDS(aa, file = paste0(outDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_MergedCT.rds'))
 
+##########################################
 ## run LIANA
-#source(paste0(functionDir, "/functions_cccInference.R"))
-#aa$celltypes = aa$subtypes
-
+##########################################
 liana_test = run_LIANA_defined_celltype(subref = aa, 
                                         celltypes = unique(aa$celltypes),
                                         additionalLabel = additionalLabel)
 
+saveRDS(liana_test, file = paste0(outDir, '/res_lianaTest_Consensus',  additionalLabel, '.rds'))
+
 #liana_test <- liana_test %>%
 #  liana_aggregate(resource = 'Consensus')
 
-liana_test = readRDS(file = paste0(outDir, '/res_lianaTest_Consensus', 
-                                   additionalLabel, '.rds'))
+liana_test = readRDS(file = paste0(outDir, '/res_lianaTest_Consensus', additionalLabel, '.rds'))
 
 liana_test <- liana_test %>%
   liana_aggregate(resource = 'Consensus')
@@ -286,8 +219,13 @@ library(dplyr)
 source(paste0(functionDir, '/functions_cccInference.R'))
 dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20230308/Rdata/'
 
-outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes')
+outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes_immuneCells_immuReceivers')
 additionalLabel = '_fixedCelltypes'
+#outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes')
+#additionalLabel = '_fixedCelltypes'
+
+aa = readRDS(file = paste0(outDir, 
+                           '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_MergedCT.rds'))
 
 #icn <- OmnipathR::import_intercell_network(ligand_receptor = TRUE) 
 icn = read.table(file = '../omnipath-intercell-network.tsv', sep = '\t', header = TRUE)
@@ -300,15 +238,15 @@ manual_ligands$gene[which(manual_ligands$gene == 'FREM2')] = "FRAS1_FREM2_NPNT"
 
 
 #res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
-aa = readRDS(file = paste0(dataDir, 
-                           '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_MergedCT.rds'))
-
 
 celltypes = unique(aa$celltypes)
 receivers = celltypes
 
+##########################################
+# select the Blastema cells 
+##########################################
 sender_cells = celltypes[grep('BL', celltypes)]
-receiver_cells = sender_cells[grep('CT', sender_cells)]
+receiver_cells = sender_cells[grep('mac|neu', sender_cells)]
 
 print(as.character(sender_cells))
 print(as.character(receiver_cells))
@@ -345,7 +283,7 @@ ligands_BL = manual_ligands$gene[which(manual_ligands$`BL or CSD` == 'BL')]
 mm = match(ligands_BL, res$ligand)
 xx_bl = res[!is.na(match(res$ligand, ligands_BL)), ]
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_manualSelectedLigands_v4.pdf')
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_manualSelectedLigands_immunTargets.pdf')
 pdf(pdfname, width=12, height = 8)
 my_CircosPlot(xx_bl, 
               weight.attribute = 'weight_norm',
@@ -363,10 +301,10 @@ write.csv(res, file = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all.csv'),
 
 res = res[!is.na(match(res$ligand, secreted_ligands)), ]
 
-write.csv(xx, file = paste0(outDir, '/LR_interactions_LIANA_tops_BL_secretedLigandsFiltered.csv'), 
-          row.names = TRUE, quote = FALSE)
+#write.csv(xx, file = paste0(outDir, '/LR_interactions_LIANA_tops_BL_secretedLigandsFiltered.csv'), 
+#          row.names = TRUE, quote = FALSE)
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_secretedLigandsFiltered_v3.pdf')
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_secretedLigandsFiltered_immunTargets.pdf')
 pdf(pdfname, width=12, height = 8)
 for(ntop in c(100, 200, 300))
 {
@@ -374,7 +312,7 @@ for(ntop in c(100, 200, 300))
   cat('top LR -- ', ntop, '\n')
   test = res[c(1:ntop), ]
   
-  jj = which(test$ligand == 'RGMB'|test$receptor == 'RGMB'|
+  jj = which(test$ligand == 'APP'|test$receptor == 'RGMB'|
                test$ligand == "FGFR3")
   if(length(jj) >0){
     test = test[-jj, ]
@@ -395,8 +333,14 @@ for(ntop in c(100, 200, 300))
 dev.off()
 
 
+##########################################
+#  select CSD cell types
+##########################################
 sender_cells = celltypes[grep('CSD', celltypes)]
-receiver_cells = sender_cells[grep('CT', sender_cells)]
+receiver_cells = sender_cells[grep('mac|neu', sender_cells)]
+
+#sender_cells = celltypes[grep('CSD', celltypes)]
+#receiver_cells = sender_cells[grep('CT', sender_cells)]
 
 print(as.character(sender_cells))
 print(as.character(receiver_cells))
@@ -427,7 +371,7 @@ mm = match(ligands_CSD, res$ligand)
 
 xx_csd = res[!is.na(match(res$ligand, ligands_CSD)), ]
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_manualSelectedLigands_v4.pdf')
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_manualSelectedLigands_immuTargets.pdf')
 pdf(pdfname, width=12, height = 8)
 my_CircosPlot(xx_csd, 
               weight.attribute = 'weight_norm',
@@ -449,7 +393,7 @@ write.csv(res, file = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_secretedLi
           row.names = TRUE, quote = FALSE)
 
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_secretedLigandsFiltered_v3.pdf')
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_secretedLigandsFiltered_immuTargets.pdf')
 pdf(pdfname, width=12, height = 8)
 
 for(ntop in c(100, 200, 300))
