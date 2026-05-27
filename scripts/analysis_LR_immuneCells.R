@@ -1,10 +1,10 @@
 ##########################################################################
 ##########################################################################
-# Project: Natasya's CSD project
-# Script purpose: analyze the signaling pathway for BL and CSD scRNA-seq data
+# Project: CSD
+# Script purpose: make the LR analysis using immune cells as receivers
 # Usage example: 
 # Author: Jingkui Wang (jingkui.wang@imp.ac.at)
-# Date of creation: Fri Jan 13 11:01:15 2023
+# Date of creation: Wed May 27 13:36:43 2026
 ##########################################################################
 ##########################################################################
 rm(list = ls())
@@ -77,538 +77,6 @@ tfs = unique(tfs$`HGNC symbol`)
 
 ########################################################
 ########################################################
-# Section 0: prepare the scRNA-seq samples  
-# import the processed scRNA data from Natasia and Tobi 
-########################################################
-########################################################
-aa = readRDS(file = paste0(dataDir, 'BL_SeuratObj.RDS'))
-#xx = readRDS(file = paste0("../fromTobie/CSD_batch1/", 'BL_SeuratObj.RDS'))
-
-aa$batch = aa$exp
-aa$time = paste0('dpa', aa$time)
-aa$time = factor(aa$time, levels = c('dpa3', 'dpa5', 'dpa6', 'dpa7', 'dpa8', 'dpa11'))
-
-aa$condition = aa$orig.ident
-aa$condition[which(aa$condition == 'BL_3_5dpa')] = 'BL_3and5dpa'
-
-aa$sample = aa$condition
-aa$days = aa$condition
-aa$days = gsub('BL_', '', aa$days)
-
-genes = c(rownames(aa)[grep('RUNX1|CBFB|ZEB1|SNAI', rownames(aa))])
-
-FeaturePlot(subs, features = genes)
-
-
-bb = readRDS(file = paste0(dataDir, 'CSD_SeuratObj.RDS'))
-
-bb$batch = bb$exp
-
-p1 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE)
-p2 = DimPlot(bb, group.by = 'celltype', label = TRUE, repel = TRUE)
-
-p1 + p2
-
-ggsave(filename = paste0(resDir, '/Tobie_umap.harmony_BL.CSD.split.pdf'), width = 18, height = 6)
-
-xx = merge(aa, bb)
-
-DimPlot(xx, group.by = 'type', label = TRUE, repel = TRUE)
-
-aa = xx
-rm(bb)
-rm(xx)
-
-aa$condition = aa$orig.ident
-aa$condition[which(aa$condition == 'BL_3_5dpa')] = 'BL_3and5dpa'
-aa$condition[which(aa$condition == 'CSD_5dpa_A')] = 'CSD_5dpa'
-aa$condition[which(aa$condition == 'CSD_5dpa_B')] = 'CSD_5dpa'
-
-aa$sample = aa$condition
-aa$sample[grep('BL_', aa$sample)] = 'BL'
-aa$sample[grep('CSD_', aa$sample)] = 'CSD'
-
-aa$days = aa$condition
-aa$days = gsub('BL_', '', aa$days)
-aa$days = gsub('CSD_', '', aa$days)
-
-
-saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_twoBacthes_merged.rds'))
-
-########################################################
-########################################################
-# Section I: batch correction for two batches and BL and CSD
-# 
-########################################################
-########################################################
-aa = readRDS(file = paste0("../results/scRNAseq_signaling.analysis_axolotl_20240116/Rdata", 
-                           '/BL.CSD_twoBacthes_merged.rds'))
-
-aa = NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
-aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000) # find subset-specific HVGs
-
-aa <- ScaleData(aa)
-
-## because the data was regressed and scaled already, only the HVGs were used to calculate PCA
-aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE, weight.by.var = TRUE)
-ElbowPlot(aa, ndims = 50)
-
-aa <- RunUMAP(aa, dims = 1:50, n.neighbors = 30, min.dist = 0.3)
-
-p1 = DimPlot(aa, group.by = 'batch', label = TRUE, repel = TRUE)
-p2 = DimPlot(aa, group.by = 'sample', label = TRUE, repel = TRUE)
-p3 = DimPlot(aa, group.by = 'condition', label = TRUE, repel = TRUE)
-
-(p1 + p2)/p3 
-
-ggsave(filename = paste0(resDir, '/UMAP_merged.BL.CSD_batch_samples_condition_no.batchCorrection.pdf'), 
-       width = 18, height = 12)
-
-DimPlot(aa, group.by = 'celltype', split.by = 'sample', label = TRUE, repel = TRUE)
-
-p1 = DimPlot(aa, group.by = 'batch', label = TRUE, repel = TRUE)
-p2 = DimPlot(aa, group.by = 'sample', label = TRUE, repel = TRUE)
-p3 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE)
-
-(p1 + p2)/p3 
-
-ggsave(filename = paste0(resDir, '/UMAP_merged.BL.CSD_batch_samples_celltypes_no.batchCorrection.pdf'), 
-       width = 18, height = 12)
-
-saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs.rds'))
-
-##########################################
-# make batch correction using harmony 
-##########################################
-aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs.rds'))
-
-source('/groups/tanaka/People/current/jiwang/projects/heart_regeneration/scripts/functions_dataIntegration.R')
-
-aa$dataset = paste0(aa$sample, '_', aa$batch)
-
-xx = IntegrateData_runHarmony(aa, group.by = 'dataset', 
-                              nfeatures = 5000, 
-                              dims.use = c(1:50),
-                              nclust = NULL,
-                              redo.normalization.hvg.scale.pca = FALSE)
-
-p1 = DimPlot(xx, group.by = 'batch', label = TRUE, repel = TRUE)
-p2 = DimPlot(xx, group.by = 'sample', label = TRUE, repel = TRUE)
-p3 = DimPlot(xx, group.by = 'celltype', label = TRUE, repel = TRUE)
-
-(p1 + p2)/p3 
-
-ggsave(filename = paste0(resDir,
-                         '/UMAP_merged.BL.CSD_batch_samples_celltypes_Harmony_twoBatch.BL.CSD.pdf'), 
-       width = 18, height = 12)
-
-p1 = DimPlot(xx, group.by = 'batch', label = TRUE, repel = TRUE)
-p2 = DimPlot(xx, group.by = 'sample', label = TRUE, repel = TRUE)
-p3 = DimPlot(xx, group.by = 'condition', label = TRUE, repel = TRUE)
-
-(p1 + p2)/p3 
-
-ggsave(filename = paste0(resDir, 
-                         '/UMAP_merged.BL.CSD_batch_samples_condition_Harmony_twoBatch.BL.CSD.pdf'), 
-       width = 18, height = 12)
-
-
-saveRDS(xx, file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs_harmony.twoBatches.rds'))
-
-
-########################################################
-########################################################
-# Section II: subset relevant cell populations:
-# connective tissue, epidermis, macrophage, neutrophils
-########################################################
-########################################################
-aa = readRDS(file = paste0("../results/scRNAseq_signaling.analysis_axolotl_20240116/Rdata", 
-                           '/BL.CSD_merged_renormalized_8000HVGs_harmony.twoBatches.rds'))
-
-Idents(aa) = aa$celltype
-
-p1 = DimPlot(aa, group.by = 'batch', label = TRUE, repel = TRUE) 
-p2 = DimPlot(aa, group.by = 'sample', label = TRUE, repel = TRUE)
-p3 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE) + NoLegend()
-
-(p1 + p2)/p3 
-
-# redo clustering 
-aa <- FindNeighbors(aa, reduction = "harmony",
-                    dims = 1:30,  k.param = 20)
-aa <- FindClusters(aa, resolution = 1.0)
-
-p1 = DimPlot(aa, label = TRUE, repel = TRUE)
-p2 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE) + NoLegend()
-p1 + p2
-
-Idents(aa) = aa$celltype
-xx = subset(aa, idents = c('Connective Tissue', 'Epidermis', 'Macrophages', 'Neutrophils'))
-DimPlot(xx, group.by = 'celltype',  label = TRUE, repel = TRUE)
-
-aa = xx
-rm(xx)
-
-aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 8000) # find subset-specific HVGs
-
-#all.genes <- rownames(aa)
-aa <- ScaleData(aa)
-
-## because the data was regressed and scaled already, only the HVGs were used to calculate PCA
-aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE, weight.by.var = TRUE)
-ElbowPlot(aa, ndims = 50)
-
-aa <- RunUMAP(aa, dims = 1:30, n.neighbors = 30, min.dist = 0.3)
-
-DimPlot(aa, group.by = 'celltype',  label = TRUE, repel = TRUE)
-
-aa <- FindNeighbors(aa, dims = 1:30,  k.param = 30)
-aa <- FindClusters(aa, resolution = 0.5)
-
-DimPlot(aa, label = TRUE, repel = TRUE)
-
-aa$clusters = aa$seurat_clusters
-
-
-p1 = DimPlot(aa, group.by = 'batch', label = TRUE, repel = TRUE) 
-p2 = DimPlot(aa, group.by = 'sample', label = TRUE, repel = TRUE)
-p3 = DimPlot(aa, group.by = 'celltype',  label = TRUE, repel = TRUE)
-p4 = DimPlot(aa, group.by = 'clusters',  label = TRUE, repel = TRUE)
-
-(p1 + p2)/(p3 + p4)
-
-ggsave(filename = paste0(resDir, 
-                         '/UMAP_merged.BL.CSD_subset_celltypes_newClusters.pdf'), 
-       width = 18, height = 12)
-
-
-saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds'))
-
-##########################################
-# double check Tobi's CT filtering
-##########################################
-Test_Tobi_CT_filtering_steps = FALSE
-if(Test_Tobi_CT_filtering_steps){
-  
-  bb = readRDS(file = paste0(dataDir, 'CSD_SeuratObj.RDS'))
-  
-  DimPlot(bb, group.by = 'seurat_clusters')
-  CSD_int = subset(bb, cells = which(bb$celltype == 'Connective Tissue'))
-  
-  DimPlot(CSD_int, group.by = 'seurat_clusters')
-  
-  CSD_CT = subset(bb, idents = c(5,12,13,17,19))
-  
-  #Cluster cells
-  CSD_CT<- FindNeighbors(CSD_CT, dims = 1:100, reduction = "harmony")
-  CSD_CT <- FindClusters(CSD_CT, resolution = 1)
-  
-  CSD_CT <- RunUMAP(CSD_CT, reduction = "harmony", dims = 1:100, min.dist = 0.1)
-  
-  pdf(paste0(resDir, "/CSD_CT_Harmony_Embedding_PC100_res1.pdf"), 
-      width=10,height=10)
-  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, pt.size = 4, shuffle= T,label = T)
-  DimPlot(object = CSD_CT, reduction = 'umap', raster = T,shuffle= T, pt.size = 4,group.by = "orig.ident")
-  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, shuffle= T, pt.size = 4,group.by = "exp")
-  FeaturePlot(CSD_CT, raster = T,pt.size = 2, features = c("nFeature_RNA","nCount_RNA","percent.mt","mCherry",
-                                                           "eGFP"), order = T, 
-              cols = c("grey",rev(viridis_pal(option = "viridis")(12))))
-  dev.off()
-  
-  #Filter low count cluster
-  VlnPlot(CSD_CT, features = c('nFeature_RNA', 'nCount_RNA', 'percent.mt'))
-
-  CSD_CT = subset(CSD_CT, idents = c(1,8,10), invert = T)
-  
-  #Cluster cells
-  CSD_CT<- FindNeighbors(CSD_CT, dims = 1:100, reduction = "harmony")
-  CSD_CT <- FindClusters(CSD_CT, resolution = 1)
-  
-  CSD_CT <- RunUMAP(CSD_CT, reduction = "harmony", dims = 1:100, min.dist = 0.1)
-  
-  
-  pdf(paste0(resDir, "/CSD_CT_Harmony_Embedding_PC100_res1_filtering_1.pdf"), 
-      width=10,height=10)
-  
-  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, pt.size = 4, shuffle= T,label = T)
-  DimPlot(object = CSD_CT, reduction = 'umap', raster = T,shuffle= T, pt.size = 4, group.by = "orig.ident")
-  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, shuffle= T, pt.size = 4, group.by = "exp")
-  FeaturePlot(CSD_CT, raster = T,pt.size = 2, features = c("nFeature_RNA","nCount_RNA","percent.mt","mCherry","eGFP"),
-              order = T, cols = c("grey",rev(viridis_pal(option = "viridis")(12))))
-  
-  dev.off()
-  
-  #Filter contaminants
-  #cluster 12 = muscle sarcolemma
-  #cluster 14 = macrophage
-  #cluster 11 = high percent.mt
-  #cluster 15 = smooth muscle
-  
-  CSD_CT = subset(CSD_CT, idents = c(11,12,14,15), invert = T)
-  
-  #Cluster cells
-  CSD_CT<- FindNeighbors(CSD_CT, dims = 1:100, reduction = "harmony")
-  CSD_CT <- FindClusters(CSD_CT, resolution = 1)
-  
-  CSD_CT <- RunUMAP(CSD_CT, reduction = "harmony", dims = 1:100, min.dist = 0.1)
-  
-  
-  pdf("CSD_CT_Harmony_Embedding_PC100_res1.pdf",width=10,height=10)
-  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, pt.size = 4, shuffle= T,label = T)
-  DimPlot(object = CSD_CT, reduction = 'umap', raster = T,shuffle= T, pt.size = 4,group.by = "orig.ident")
-  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, shuffle= T, pt.size = 4,group.by = "exp")
-  FeaturePlot(CSD_CT, raster = T,pt.size = 2, features = c("nFeature_RNA","nCount_RNA","percent.mt","mCherry","eGFP"),
-              order = T, cols = c("grey",rev(viridis_pal(option = "viridis")(12))))
-  dev.off()
-  
-  #Filter low count cluster
-  #cluster 1 = low count and blood signal
-  CSD_CT = subset(CSD_CT, idents = c(1,5), invert = T)
-  
-  #Cluster cells
-  CSD_CT<- FindNeighbors(CSD_CT, dims = 1:100, reduction = "harmony")
-  CSD_CT <- FindClusters(CSD_CT, resolution = 1)
-  
-  CSD_CT <- RunUMAP(CSD_CT, reduction = "harmony", dims = 1:100, min.dist = 0.1)
-  
-  CSD_CT@meta.data$time = CSD_CT@meta.data$orig.ident
-  CSD_CT@meta.data$time = gsub("dpa","",CSD_CT@meta.data$time)
-  CSD_CT@meta.data$time = gsub("_A","",CSD_CT@meta.data$time)
-  CSD_CT@meta.data$time = gsub("_B","",CSD_CT@meta.data$time)
-  CSD_CT@meta.data$time = gsub("CSD_","",CSD_CT@meta.data$time)
-  CSD_CT@meta.data$time = as.numeric(CSD_CT@meta.data$time)
-  
-  
-  CSD_CT@meta.data$injury = "CSD"
-  
-  #my_spectral_palette = colorRampPalette(colors = grafify:::graf_palettes$okabe_ito[1:8])
-  
-  pdf("CSD_CT_Harmony_Embedding_PC100_res1.pdf",width=10,height=10)
-  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, pt.size = 4, shuffle= T,label = T, 
-          cols = my_spectral_palette(length(unique(CSD_CT@active.ident))))
-  DimPlot(object = CSD_CT, reduction = 'umap', raster = T,shuffle= T, pt.size = 4,group.by = "orig.ident")
-  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, shuffle= T, pt.size = 4,group.by = "exp")
-  DimPlot(object = CSD_CT, reduction = 'umap',raster = T, shuffle= T, pt.size = 3,group.by = "time",
-          cols = c("grey50",rev(viridis_pal(option = "plasma")(length(unique(CSD_CT@meta.data$time))-1))))
-  FeaturePlot(CSD_CT, raster = T,pt.size = 2, features = c("nFeature_RNA","nCount_RNA","percent.mt","mCherry","eGFP"),
-              order = T, cols = c("grey",rev(viridis_pal(option = "viridis")(12))))
-  dev.off()
-  
-  gene_ids = c("AMEX60DD048840","AMEX60DD023361","AMEX60DD029426","AMEX60DD055540","AMEX60DD029436", 
-               "AMEX60DD037674","AMEX60DD023964","AMEX60DD009987","AMEX60DD030520","AMEX60DD048972",
-               "AMEX60DD002658","AMEX60DD012132","AMEX60DD018450","AMEX60DD020580","AMEX60DD052517",
-               "AMEX60DD053922","AMEX60DD048332","AMEX60DD052070","AMEX60DD031414","AMEX60DD024964",
-               "AMEX60DD045921","AMEX60DD035908","AMEX60DD006619","AMEX60DD013910","AMEX60DD025537")
-  
-  gene_names =c("KLF5","COL7A1","COL2A1","COL6A1","TWIST3","TNMD","ASPN","MEOX1","MGP",
-                "CNMD","OTOS","GREM1","PRRX1","MYH11","ACTA2","TAGLN","COL8A1","C1QB","LGALS3BP",
-                "LECT2","S100P","EPCAM","VWF","PLVAP","ALAS2")
-  
-  gg_Fig <- FeaturePlot(CSD_CT, pt.size = 2,raster = T, features = gene_ids,order = T, slot = "data", repel=T)
-  gg_Fig <- lapply( 1:length(gene_ids), function(x) { gg_Fig[[x]] + labs(title=gene_names[x])  & NoAxes()})
-  #,cols = c("grey",rev(viridis_pal(option = "mako")(12)))
-  
-  
-  pdf("CSD_CT_Harmony_UMAP_feature_CellAtlas_Marker_raw.pdf",width=16,height=10)
-  CombinePlots( gg_Fig )
-  dev.off()
-  
-}
-
-
-##########################################
-# check the condition and time changes for each cell type 
-##########################################
-aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds'))
-
-aa$celltype[which(aa$celltype == 'Connective Tissue')] = 'CT'
-Idents(aa) = aa$celltype
-
-celltype = 'CT'
-sub.obj = subset(x = aa, idents = celltype)
-
-sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 5000)
-sub.obj = ScaleData(sub.obj)
-sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
-ElbowPlot(sub.obj, ndims = 30)
-
-nb.pcs = 30 # nb of pcs depends on the considered clusters or ids
-n.neighbors = 30; min.dist = 0.3;
-sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", 
-                   dims = 1:nb.pcs, 
-                   n.neighbors = n.neighbors,
-                   min.dist = min.dist)
-
-p1 = DimPlot(sub.obj, group.by = 'batch', label = TRUE, repel = TRUE) 
-p2 = DimPlot(sub.obj, group.by = 'sample', label = TRUE, repel = TRUE)
-p3 = DimPlot(sub.obj, group.by = 'condition',  label = TRUE, repel = TRUE)
-p4 = DimPlot(sub.obj, group.by = 'Phase',  label = TRUE, repel = TRUE)
-
-(p1 + p2)/(p3 + p4)
-
-ggsave(filename = paste0(resDir, 
-                         '/UMAP_merged.BL.CSD_subset_celltypes_checkEachcelltypes.aross.condition.time_',
-                         'noBatchIntegration_', celltype,  '.pdf'), 
-       width = 18, height = 12)
-
-
-source(paste0('/groups/tanaka/People/current/jiwang/projects/heart_regeneration/',
-              'scripts/functions_dataIntegration.R'))
-
-xx = IntegrateData_runHarmony(sub.obj, group.by = 'dataset', 
-                              nfeatures = 5000, 
-                              dims.use = c(1:30), 
-                              nclust = NULL,
-                              redo.normalization.hvg.scale.pca = TRUE)
-
-xx <- RunUMAP(xx, reduction = "harmony", dims = 1:50, n.neighbors = 50, min.dist = 0.1)
-
-p1 = DimPlot(xx, group.by = 'batch', label = TRUE, repel = TRUE) 
-p2 = DimPlot(xx, group.by = 'sample', label = TRUE, repel = TRUE)
-p3 = DimPlot(xx, group.by = 'condition',  label = TRUE, repel = TRUE)
-p4 = DimPlot(xx, group.by = 'Phase',  label = TRUE, repel = TRUE)
-
-(p1 + p2)/(p3 + p4)
-ggsave(filename = paste0(resDir, 
-                         '/UMAP_merged.BL.CSD_subset_celltypes_checkEachcelltypes.aross.condition.time_',
-                         'BatchIntegration_Harmony_', celltype,  '.pdf'), 
-       width = 18, height = 12)
-
-
-xx <- FindNeighbors(xx, dims = 1:50, reduction = "harmony")
-xx <- FindClusters(xx, resolution = 1)
-
-pdf(paste0(resDir, "/",  celltype,  "_Harmony_Embedding.pdf"), 
-    width=10, height=8)
-DimPlot(object = xx, reduction = 'umap',raster = T, pt.size = 4, shuffle= T,label = T)
-
-DimPlot(object = xx, reduction = 'umap', raster = T,shuffle= T, pt.size = 4,group.by = "orig.ident")
-DimPlot(object = xx, reduction = 'umap',raster = T, shuffle= T, pt.size = 4,group.by = "exp")
-DimPlot(object = xx, reduction = 'umap',raster = T, shuffle= T, pt.size = 3,group.by = "time",
-        cols = c("grey50",rev(viridis_pal(option = "plasma")(length(unique(xx@meta.data$time))-1))))
-FeaturePlot(xx, raster = T,pt.size = 2, features = c("nFeature_RNA","nCount_RNA","percent.mt","mCherry","eGFP"),
-            order = T)
-
-VlnPlot(xx, features = 'nFeature_RNA')
-VlnPlot(xx, features = 'nCount_RNA')
-VlnPlot(xx, features = 'percent.mt')
-VlnPlot(xx, features = 'mCherry')
-
-dev.off()
-
-xx = subset(xx, idents = c(2, 6, 7, 11, 12, 13, 20, 21, 14, 24), invert = T)
-
-xx <- RunUMAP(xx, reduction = "harmony", dims = 1:50,  min.dist = 0.1)
-
-p1 = DimPlot(xx, group.by = 'batch', label = TRUE, repel = TRUE) 
-p2 = DimPlot(xx, group.by = 'sample', label = TRUE, repel = TRUE)
-p3 = DimPlot(xx, group.by = 'condition',  label = TRUE, repel = TRUE)
-p4 = DimPlot(xx, group.by = 'Phase',  label = TRUE, repel = TRUE)
-
-(p1 + p2)/(p3 + p4)
-
-xx <- FindNeighbors(xx, dims = 1:50, reduction = "harmony")
-xx <- FindClusters(xx, resolution = 1)
-
-
-pdf(paste0(resDir, "/",  celltype,  "_Harmony_Embedding_filtered.pdf"), 
-    width=10, height=8)
-DimPlot(object = xx, reduction = 'umap',raster = T, pt.size = 4, shuffle= T,label = T)
-
-DimPlot(object = xx, reduction = 'umap', raster = T,shuffle= T, pt.size = 4,group.by = "orig.ident")
-DimPlot(object = xx, reduction = 'umap',raster = T, shuffle= T, pt.size = 4,group.by = "exp")
-DimPlot(object = xx, reduction = 'umap',raster = T, shuffle= T, pt.size = 3,group.by = "time",
-        cols = c("grey50",rev(viridis_pal(option = "plasma")(length(unique(xx@meta.data$time))-1))))
-FeaturePlot(xx, raster = T,pt.size = 2, features = c("nFeature_RNA","nCount_RNA","percent.mt","mCherry","eGFP"),
-            order = T)
-
-VlnPlot(xx, features = 'nFeature_RNA')
-VlnPlot(xx, features = 'nCount_RNA')
-VlnPlot(xx, features = 'percent.mt')
-VlnPlot(xx, features = 'mCherry')
-
-dev.off()
-
-yy = readRDS(file = paste0(dataDir, 'BLct_CSDct_Harmony_SeuratObj.RDS'))
-DimPlot(yy, group.by = 'type')
-
-ggs = convert_to_geneSymbol(rownames(xx), annot = annot)
-which(ggs == 'PRRX1')
-FeaturePlot(xx, features = rownames(xx)[ which(ggs == 'HMGB3')])
-
-
-##########################################
-# epidermis  
-##########################################
-aa = readRDS(paste0(dataDir, 'BLep_CSDep_Harmony_SeuratObj.RDS'))
-
-
-p1 = DimPlot(aa, group.by = 'injury')
-p2 = DimPlot(object = aa, reduction = 'umap',raster = T, shuffle= T, pt.size = 3,group.by = "time",
-        cols = c("grey50",rev(viridis_pal(option = "plasma")(length(unique(xx@meta.data$time))-1))))
-
-aa <- FindNeighbors(aa, dims = 1:50, reduction = "harmony")
-aa <- FindClusters(aa, resolution = 0.5)
-
-p3 = DimPlot(aa, group.by = 'seurat_clusters', label = TRUE, repel = TRUE)
-
-(p1 + p2)/p3
-
-ggs = c('AMEX60DD053027', 'AMEX60DD050718', 'AMEX60DD044963',
-          'AMEX60DD014606', 'AMEX60DD018809', 'AMEX60DD018809',
-          'AMEX60DD055164', 'AMEX60DD055164', 'AMEX60DD022398',
-          'AMEX60DD009937')
-FeaturePlot(aa, features = ggs)
-
-genes = convert_to_geneSymbol(ggs, annot = annot)
-
-
-
-
-Idents(aa) = aa$seurat_clusters
-
-markers = FindAllMarkers(aa, only.pos = TRUE,  
-                         min.pct = 0.1, 
-                         logfc.threshold = 0.25)
-
-markers = readRDS(file = paste0(RdataDir, '/Epidermis_markers.rds'))
-markers$geneSymbols = convert_to_geneSymbol(markers$gene, annot = annot)
-saveRDS(markers, file = paste0(RdataDir, '/Epidermis_markers.rds'))
-
-markers = readRDS(file = paste0(RdataDir, '/Epidermis_markers.rds'))
-markers = markers[!is.na(match(markers$geneSymbols, c(tfs, sps))), ]
-
-
-markers %>%
-  group_by(cluster) %>%
-  top_n(n = 10, wt = avg_log2FC) -> top10
-
-DoHeatmap(aa, features = top10$gene) + NoLegend()
-
-ggsave(filename = paste0(resDir,  'Epidermis_heatmap_markerGenes_top10.pdf'), 
-       width = 12, height = 30)
-
-markers = markers[which(markers$cluster == 4), ]
-
-write.csv2(markers, file = paste0(resDir, '/markerGenes_Blastema_specific_Epidermis.csv'), row.names = TRUE)
-
-
-features = intersect(markers$gene[which(markers$p_val < 10^-100)], sps)
-cat(length(features), ' genes to display \n')
-
-DoHeatmap(aa, features = features) + NoLegend()
-ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_signalingGenes_by_', cell_ids, '.pdf'), 
-       width = 12, height = 40)
-
-tfs_sel = intersect(tfs, markers$gene[which(markers$p_val < 10^-50)])
-
-DoHeatmap(aa, features = tfs_sel) + NoLegend()
-ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_TFs_by_', cell_ids, '.pdf'), 
-       width = 12, height = 30)
-
-
-########################################################
-########################################################
 # Section II : ligand-receptor anlaysis
 # e.g. LIANA and NicheNet with defined subpopulation
 # test LIANA and NicheNet using clusters 
@@ -618,14 +86,16 @@ ggsave(filename = paste0(saveDir,  'heatmap_markerGenes_TFs_by_', cell_ids, '.pd
 dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20230308/Rdata/'
 aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
 
-
 ##############################
 # test LIANA for all pairs
 ##########################################
 #dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20240116/Rdata/'
 #aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds'))
-outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes_immuneCells')
+outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes_immuneCells_immuReceivers')
 additionalLabel = '_fixedCelltypes'
+
+if(!dir.exists(outDir)) dir.create(outDir)
+
 
 aa$condition = droplevels(aa$condition)
 
@@ -644,7 +114,7 @@ aa$subtypes[which(aa$subtypes == 'CT_BL_early_2')] = 'CT_BL_early_1'
 
 DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
 
-ggsave(filename = paste0(resDir,  '/UMAP_subtypes.pdf'), 
+ggsave(filename = paste0(outDir,  '/UMAP_subtypes.pdf'), 
        width = 12, height = 8)
 
 p1 = DimPlot(aa, group.by = 'condition', label = TRUE, repel = TRUE)
@@ -652,7 +122,7 @@ p2 = DimPlot(aa, group.by = 'celltype', label = TRUE, repel = TRUE)
 
 p1 + p2
 
-ggsave(filename = paste0(resDir,  '/UMAP_condition_celltype.pdf'),
+ggsave(filename = paste0(outDir,  '/UMAP_condition_celltype.pdf'),
        width = 16, height = 6)
 
 Subset_epidermis = FALSE
@@ -723,7 +193,7 @@ if(Subset_epidermis){
 
 
 ## manually merge again the CT
-merge_CT_subclusters = FALSE
+merge_CT_subclusters = TRUE
 if(merge_CT_subclusters){
   aa$subtypes[grep('CT_BL_early', aa$subtypes)] = 'CT_BL_early'
   
@@ -752,8 +222,8 @@ saveRDS(aa, file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_
 #aa$celltypes = aa$subtypes
 
 liana_test = run_LIANA_defined_celltype(subref = aa, 
-                           celltypes = unique(aa$celltypes),
-                           additionalLabel = additionalLabel)
+                                        celltypes = unique(aa$celltypes),
+                                        additionalLabel = additionalLabel)
 
 #liana_test <- liana_test %>%
 #  liana_aggregate(resource = 'Consensus')
@@ -780,7 +250,7 @@ saveRDS(liana_test, file = paste0(outDir, '/res_lianaTest_Consensus',
 ## prepare the LIANA output for circoplot
 res = df_test
 res = res[, c(1:5, which(colnames(res) == 'natmi.edge_specificity'), 
-                which(colnames(res) == 'sca.LRscore'))]
+              which(colnames(res) == 'sca.LRscore'))]
 colnames(res)[1:4] = c('sender', 'receiver', 'ligand', 'receptor')
 
 
@@ -1363,7 +833,7 @@ for(es_cut in seq(1, 3, by = 1))
                limits = c(0.1, 1)
                #oob = scales::squish
     ) +
-  
+    
     #scale_fill_viridis_c(option = "magma") + 
     #scale_fill_gradientn(#values = scales::rescale(c(min(br), 0, max(br))),
     #                     colours = cols) +
@@ -1401,7 +871,7 @@ kk = grep('COL|FN1|LAM', test_csd$ligand, invert = TRUE)
 test_csd = test_csd[kk, ]
 
 write.csv(test_csd, file = paste0(outDir, 
-                                 '/LR_interactions_LIANA_CSDspecific_secretedLigands_ColFnLamFiltered.csv'),
+                                  '/LR_interactions_LIANA_CSDspecific_secretedLigands_ColFnLamFiltered.csv'),
           row.names = TRUE, quote = FALSE)
 
 ggs = unique(test_csd$ligand)
@@ -1508,4 +978,7 @@ for(es_cut in seq(1, 3, by = 1))
 }
 
 dev.off()
+
+
+
 
