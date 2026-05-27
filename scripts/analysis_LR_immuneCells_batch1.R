@@ -83,6 +83,7 @@ tfs = unique(tfs$`HGNC symbol`)
 ########################################################
 ########################################################
 ## LR interaction using only the cells from batch1
+## BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds only first batch data in this rds
 dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20230308/Rdata/'
 aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds'))
 
