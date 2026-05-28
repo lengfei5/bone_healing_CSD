@@ -157,14 +157,19 @@ saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap_b
 ##########################################
 aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap_batch1_batch2.rds'))
 
-aa$celltype[which(aa$celltype == 'connective tissue')] = 'CT'
+aa$celltype[which(aa$celltype == 'Connective Tissue')] = 'CT'
 Idents(aa) = aa$celltype
 aa$condition = factor(aa$condition, levels = levels)
 
+aa$groups = paste0(aa$batch, '_', aa$condition)
 
 
+table(aa$batch, aa$condition)
+table(aa$batch, aa$celltype)
+table(aa$batch, aa$groups)
+table(aa$groups, aa$celltype)
 
-aa$groups = paste0(aa$celltype, '_', aa$condition)
+
 
 Idents(aa) = aa$condition
 xx = subset(aa, idents= c('BL_3_5dpa', 'BL_8dpa', 'CSD_3dpa', 'CSD_5dpa', 'CSD_8dpa'))
