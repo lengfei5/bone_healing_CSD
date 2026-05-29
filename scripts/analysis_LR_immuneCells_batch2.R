@@ -75,6 +75,12 @@ tfs = readRDS(file = paste0('/groups/tanaka/People/current/jiwang/projects/RA_co
 tfs = unique(tfs$`HGNC symbol`)
 
 
+outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes_immuneCells_immuReceiver_batch2')
+additionalLabel = '_fixedCelltypes'
+
+if(!dir.exists(outDir)) dir.create(outDir)
+
+
 ########################################################
 ########################################################
 # Section II : ligand-receptor anlaysis
@@ -82,10 +88,6 @@ tfs = unique(tfs$`HGNC symbol`)
 # test LIANA and NicheNet using clusters 
 ########################################################
 ########################################################
-outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes_immuneCells_immuReceiver_batch2')
-additionalLabel = '_fixedCelltypes'
-
-if(!dir.exists(outDir)) dir.create(outDir)
 
 ##########################################
 # process the batch 1 and batch 2 data 
@@ -169,16 +171,19 @@ table(aa$batch, aa$celltype)
 table(aa$batch, aa$groups)
 table(aa$groups, aa$celltype)
 
+jj = which(aa$batch == 'batch2' & aa$condition != 'BL_5dpa' & aa$condition != 'CSD_5dpa')
+table(aa$groups[jj], aa$celltype[jj])
 
 
-Idents(aa) = aa$condition
-xx = subset(aa, idents= c('BL_3_5dpa', 'BL_8dpa', 'CSD_3dpa', 'CSD_5dpa', 'CSD_8dpa'))
+Idents(aa) = aa$groups
+
+xx = subset(aa, idents= c('batch2_BL_6dpa', 'batch2_BL_7dpa', 'batch2_CSD_6dpa', 'batch2_CSD_7dpa'))
 counts = xx@assays$RNA@counts
 
 rownames(counts) = convert_to_geneSymbol(rownames(counts), annot = annot)
 counts = counts[grep('^AMEX', rownames(counts), invert = TRUE), ]
 
-aa = CreateSeuratObject(counts = counts, assay = 'RNA', meta.data = xx@meta.data) 
+aa = CreateSeuratObject(counts = counts, assay = 'RNA', meta.data = xx@meta.data)
 aa = NormalizeData(aa, scale.factor = 10000)
 
 # rerun the umap
@@ -197,7 +202,7 @@ p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltype')
 
 p1 / p2
 
-saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8.rds'))
+saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day6_7.rds'))
 
 ## LR interaction using only the cells from batch1
 ## BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds only first batch data in this rds
