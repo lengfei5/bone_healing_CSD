@@ -204,6 +204,52 @@ p1 / p2
 
 saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day6_7.rds'))
 
+
+##########################################
+# process and clean the clusters
+##########################################
+aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day6_7.rds'))
+
+p1 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'condition', raster=FALSE)
+p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltype')
+
+p1 + p2
+
+ggsave(filename = paste0(outDir, '/UMAP_merged.BL.CSD_subsets_CT_MAC_Neu_Epd_day6_7_beforeCleaning.pdf'), 
+       width = 14, height = 6)
+
+aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 5000)
+aa = ScaleData(aa)
+aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE, weight.by.var = TRUE)
+ElbowPlot(aa, ndims = 50)
+
+aa <- FindNeighbors(aa, dims = 1:20,  k.param = 30)
+aa <- FindClusters(aa, resolution = 0.5)
+
+aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.05)
+
+p1 = DimPlot(aa, label = TRUE, repel = TRUE,  raster=FALSE)
+p2 = DimPlot(aa, label = TRUE, repel = TRUE, group.by = 'celltype')
+
+p1 + p2
+
+# markers.ax = FindAllMarkers(aa, logfc.threshold = 0.5, min.pct = 0.5)
+# 
+# cat(length(unique(markers.ax$gene)), ' markers found in ax\n')
+# 
+# markers.ax %>%
+#   group_by(cluster) %>%
+#   dplyr::filter(avg_log2FC > 0.5) %>%
+#   slice_head(n = 50) %>%
+#   ungroup() -> top10
+# 
+# ggs = top10$gene[which(top10$cluster == 'immune_cells')]
+# ggs = ggs[grep('^AME|^LOC', ggs, invert = TRUE)]
+# ggs = ggs[order(ggs)]
+# 
+# DoHeatmap(aa, features = top10$gene) + NoLegend()
+
+
 ## LR interaction using only the cells from batch1
 ## BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_umap.rds only first batch data in this rds
 #dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20230308/Rdata/'
@@ -216,17 +262,37 @@ saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day6_7
 #aa = readRDS(file = paste0(dataDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_umap.rds'))
 aa$condition = droplevels(aa$condition)
 
+# Mac_BL_early #2AD0B7
+# Neu_BL_early #98B304
+# Epidermis_BL_early #16005e
+# CT_BL_early_1 #005e45
+# CT_BL_early_3 #2f7c67
+# Epidermis_BL.CSD_early #3200F5
+
+aa$subtypes = aa$celltype
+aa$subtypes[which(aa$subtypes == 'Epidermis')] = 'Epi'
+aa$subtypes[which(aa$subtypes == 'Macrophages')] = 'Mac'
+aa$subtypes[which(aa$subtypes == 'Neutrophils')] = 'Neu'
+jj = grep('BL_', aa$condition)
+aa$subtypes[jj] = paste0(aa$subtypes[jj], '_BL_late')
+jj2 = setdiff(c(1:ncol(aa)), jj)
+aa$subtypes[jj2] = paste0(aa$subtypes[jj2], '_CSD_late')
+
+
 p1 = DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
 p2 = DimPlot(aa, group.by = 'condition', label = TRUE, repel = TRUE)
 p1 + p2
+
+ggsave(filename = paste0(outDir, '/UMAP_merged.BL.CSD_subsets_CT_MAC_Neu_Epd_day6_7_forLIANA.pdf'), 
+       width = 14, height = 6)
 
 table(aa$subtypes, aa$condition)
 
 
 ## manually merge subclusters
-aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_2')] = 'epidermis_BL_early'
-aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_1')] = 'epidermis_BL_early'
-aa$subtypes[which(aa$subtypes == 'CT_BL_early_2')] = 'CT_BL_early_1'
+# aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_2')] = 'epidermis_BL_early'
+# aa$subtypes[which(aa$subtypes == 'epidermis_BL_early_1')] = 'epidermis_BL_early'
+# aa$subtypes[which(aa$subtypes == 'CT_BL_early_2')] = 'CT_BL_early_1'
 
 DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
 
@@ -242,34 +308,23 @@ ggsave(filename = paste0(outDir,  '/UMAP_condition_celltype.pdf'),
        width = 16, height = 6)
 
 
-## manually merge again the CT
-merge_CT_subclusters = TRUE
-if(merge_CT_subclusters){
-  aa$subtypes[grep('CT_BL_early', aa$subtypes)] = 'CT_BL_early'
-  
-  aa$subtypes[grep('CT_CSD_early', aa$subtypes)] = 'CT_CSD_early'
-  
-  DimPlot(aa, group.by = 'subtypes', label = TRUE, repel = TRUE)
-  
-  ggsave(filename = paste0(resDir,  '/UMAP_subtypes_afterMergingCT.pdf'), 
-         width = 12, height = 8)
-  
-}
-
-
 aa$subtypes = factor(aa$subtypes, levels = sort(unique(aa$subtypes)))
 
 aa = ScaleData(aa, features = rownames(aa))
 
 Idents(aa) = aa$subtypes
-source("functions_ligandReceptor_analysis.R")
-aa$celltypes = aa$subtypes
 
-saveRDS(aa, file = paste0(outDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_MergedCT.rds'))
+
+saveRDS(aa, file = paste0(outDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day6_7_subtypes.rds'))
 
 ##########################################
 ## run LIANA
 ##########################################
+aa = readRDS(file = paste0(outDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day6_7_subtypes.rds'))
+
+source("functions_ligandReceptor_analysis.R")
+aa$celltypes = aa$subtypes
+
 liana_test = run_LIANA_defined_celltype(subref = aa, 
                                         celltypes = unique(aa$celltypes),
                                         additionalLabel = additionalLabel)
@@ -336,13 +391,13 @@ library(dplyr)
 source(paste0(functionDir, '/functions_cccInference.R'))
 dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20230308/Rdata/'
 
-outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes_immuneCells_immuReceivers')
-additionalLabel = '_fixedCelltypes'
+#outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes_immuneCells_immuReceivers')
+#additionalLabel = '_fixedCelltypes'
 #outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes')
 #additionalLabel = '_fixedCelltypes'
 
-aa = readRDS(file = paste0(outDir, 
-                           '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_MergedCT.rds'))
+#aa = readRDS(file = paste0(outDir, 
+#                           '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_MergedCT.rds'))
 
 #icn <- OmnipathR::import_intercell_network(ligand_receptor = TRUE) 
 icn = read.table(file = '../omnipath-intercell-network.tsv', sep = '\t', header = TRUE)
@@ -356,14 +411,14 @@ manual_ligands$gene[which(manual_ligands$gene == 'FREM2')] = "FRAS1_FREM2_NPNT"
 
 #res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
 
-celltypes = unique(aa$celltypes)
+celltypes = unique(as.character(aa$celltypes))
 receivers = celltypes
 
 ##########################################
 # select the Blastema cells 
 ##########################################
 sender_cells = celltypes[grep('BL', celltypes)]
-receiver_cells = sender_cells[grep('mac|neu', sender_cells)]
+receiver_cells = sender_cells[grep('Mac|Neu', sender_cells)]
 
 print(as.character(sender_cells))
 print(as.character(receiver_cells))
@@ -384,9 +439,9 @@ head(grep('WNT', res$ligand))
 cells.of.interest = unique(c(res$source, res$target))
 print(cells.of.interest)
 
-cell_color = c("#2AD0B7", "#98B304", "#16005e", "#005e45", "#3200F5")
-names(cell_color) <- c("mac_BL_early", "neu_BL_early", "epidermis_BL_early",
-                       "CT_BL_early", "epidermis_BL.CSD_early")
+cell_color = c("#2AD0B7", "#98B304", "#16005e", "#005e45")
+names(cell_color) <- c("Mac_BL_late", "Neu_BL_late", "Epi_BL_late",
+                       "CT_BL_late")
 cell_color = cell_color[match(cells.of.interest, names(cell_color))]
 
 # Mac_BL_early #2AD0B7
@@ -454,7 +509,7 @@ dev.off()
 #  select CSD cell types
 ##########################################
 sender_cells = celltypes[grep('CSD', celltypes)]
-receiver_cells = sender_cells[grep('mac|neu', sender_cells)]
+receiver_cells = sender_cells[grep('Mac|Neu', sender_cells)]
 
 #sender_cells = celltypes[grep('CSD', celltypes)]
 #receiver_cells = sender_cells[grep('CT', sender_cells)]
@@ -473,7 +528,7 @@ cells.of.interest = unique(c(res$source, res$target))
 print(cells.of.interest)
 
 cell_color = c("#2AD0B7", "#98B304", "#d693b8", "#3200F5")
-names(cell_color) <- c("mac_CSD_early", "neu_CSD_early",  "CT_CSD_early", "epidermis_BL.CSD_early")
+names(cell_color) <- c("Mac_CSD_late", "Neu_CSD_late",  "CT_CSD_late", "Epi_CSD_late")
 
 # Mac_CSD_early #2AD0B7
 # Neu_CSD_early #98B304
