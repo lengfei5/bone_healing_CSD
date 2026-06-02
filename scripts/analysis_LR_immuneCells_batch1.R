@@ -246,6 +246,7 @@ receivers = celltypes
 ##########################################
 # select the Blastema cells 
 ##########################################
+
 sender_cells = celltypes[grep('BL', celltypes)]
 receiver_cells = sender_cells[grep('mac|neu', sender_cells)]
 
