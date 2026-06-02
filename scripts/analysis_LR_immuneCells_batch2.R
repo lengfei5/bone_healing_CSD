@@ -51,6 +51,7 @@ convert_to_geneSymbol = function(gene.ids, annot)
   
 }
 
+
 levels = c('CSD_0dpa', 
            'BL_3and5dpa', 'BL_5dpa', 'BL_6dpa', 'BL_7dpa',  'BL_8dpa', 'BL_11dpa', 
            'CSD_3dpa', 'CSD_5dpa', 'CSD_6dpa', 'CSD_7dpa', 'CSD_8dpa', 'CSD_11dpa')
@@ -391,15 +392,10 @@ library(dplyr)
 source(paste0(functionDir, '/functions_cccInference.R'))
 dataDir = '../results/scRNAseq_signaling.analysis_axolotl_20230308/Rdata/'
 
-#outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes_immuneCells_immuReceivers')
-#additionalLabel = '_fixedCelltypes'
-#outDir = paste0(resDir, '/LR_analysis_LIANA_mergingCTsubtypes')
-#additionalLabel = '_fixedCelltypes'
+aa = readRDS(file = paste0(outDir, '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day6_7_subtypes.rds'))
+aa$celltypes = aa$subtypes
 
-#aa = readRDS(file = paste0(outDir, 
-#                           '/BL.CSD_merged_subset_CT_MAC_Neu_Epd_day3_5_8_subtypes_MergedCT.rds'))
 
-#icn <- OmnipathR::import_intercell_network(ligand_receptor = TRUE) 
 icn = read.table(file = '../omnipath-intercell-network.tsv', sep = '\t', header = TRUE)
 icn = icn[which(icn$secreted_intercell_source == TRUE), ]
 secreted_ligands = unique(icn$genesymbol_intercell_source)
@@ -415,10 +411,15 @@ celltypes = unique(as.character(aa$celltypes))
 receivers = celltypes
 
 ##########################################
-# select the Blastema cells 
+# make plots for selected receivers
 ##########################################
+selected_receiver = 'Mac'
+
+#selected_receiver = 'Neu'
+
+## first plot in BL
 sender_cells = celltypes[grep('BL', celltypes)]
-receiver_cells = sender_cells[grep('Mac|Neu', sender_cells)]
+receiver_cells = sender_cells[grep(selected_receiver, sender_cells)]
 
 print(as.character(sender_cells))
 print(as.character(receiver_cells))
@@ -455,7 +456,8 @@ ligands_BL = manual_ligands$gene[which(manual_ligands$`BL or CSD` == 'BL')]
 mm = match(ligands_BL, res$ligand)
 xx_bl = res[!is.na(match(res$ligand, ligands_BL)), ]
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_manualSelectedLigands_immunTargets.pdf')
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_manualSelectedLigands_immunTargets_, ',
+                 selected_receiver, '.pdf')
 pdf(pdfname, width=12, height = 8)
 my_CircosPlot(xx_bl, 
               weight.attribute = 'weight_norm',
@@ -468,21 +470,25 @@ my_CircosPlot(xx_bl,
 dev.off()
 
 
-write.csv(res, file = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all.csv'), 
+write.csv(res, file = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_', selected_receiver, '.csv'), 
           row.names = TRUE, quote = FALSE)
 
 res = res[!is.na(match(res$ligand, secreted_ligands)), ]
 
-#write.csv(xx, file = paste0(outDir, '/LR_interactions_LIANA_tops_BL_secretedLigandsFiltered.csv'), 
-#          row.names = TRUE, quote = FALSE)
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_secretedLigandsFiltered_immunTargets.pdf')
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_secretedLigandsFiltered_immunTargets_',
+                 selected_receiver, '.pdf')
 pdf(pdfname, width=12, height = 8)
 for(ntop in c(100, 200, 300))
 {
   # ntop = 300
   cat('top LR -- ', ntop, '\n')
-  test = res[c(1:ntop), ]
+  
+  if(nrow(res) < ntop){
+    test = res
+  }else{
+    test = res[c(1:ntop), ]
+  }
   
   jj = which(test$ligand == 'APP'|test$receptor == 'RGMB'|
                test$ligand == "FGFR3")
@@ -499,7 +505,6 @@ for(ntop in c(100, 200, 300))
                 targets.include = cells.of.interest,
                 lab.cex = 0.5,
                 title = paste('LR scores top :', ntop))
-  
 }
 
 dev.off()
@@ -509,7 +514,7 @@ dev.off()
 #  select CSD cell types
 ##########################################
 sender_cells = celltypes[grep('CSD', celltypes)]
-receiver_cells = sender_cells[grep('Mac|Neu', sender_cells)]
+receiver_cells = sender_cells[grep(selected_receiver, sender_cells)]
 
 #sender_cells = celltypes[grep('CSD', celltypes)]
 #receiver_cells = sender_cells[grep('CT', sender_cells)]
@@ -530,20 +535,14 @@ print(cells.of.interest)
 cell_color = c("#2AD0B7", "#98B304", "#d693b8", "#3200F5")
 names(cell_color) <- c("Mac_CSD_late", "Neu_CSD_late",  "CT_CSD_late", "Epi_CSD_late")
 
-# Mac_CSD_early #2AD0B7
-# Neu_CSD_early #98B304
-# CT_CSD_early_1 #d693b8
-# CT_CSD_early_2 #925677
-# CT_ CSD_early_3 #61394f
-# Epidermis_BL.CSD_early #3200F5
-
 ligands_CSD = manual_ligands$gene[which(manual_ligands$`BL or CSD` == 'CSD')]
 ligands_CSD = ligands_CSD[!is.na(ligands_CSD)]
 mm = match(ligands_CSD, res$ligand)
 
 xx_csd = res[!is.na(match(res$ligand, ligands_CSD)), ]
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_manualSelectedLigands_immuTargets.pdf')
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_manualSelectedLigands_immuTargets_',
+                 selected_receiver, '.pdf')
 pdf(pdfname, width=12, height = 8)
 my_CircosPlot(xx_csd, 
               weight.attribute = 'weight_norm',
@@ -555,25 +554,32 @@ my_CircosPlot(xx_csd,
 
 dev.off()
 
-
-write.csv(res, file = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all.csv'), 
+write.csv(res, file = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_', selected_receiver, '.csv'), 
           row.names = TRUE, quote = FALSE)
 
 res = res[!is.na(match(res$ligand, secreted_ligands)), ]
 
-write.csv(res, file = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_secretedLigandsFiltered.csv'), 
+write.csv(res, file = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_secretedLigandsFiltered_', 
+                             selected_receiver, '.csv'), 
           row.names = TRUE, quote = FALSE)
 
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_secretedLigandsFiltered_immuTargets.pdf')
+pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_secretedLigandsFiltered_immuTargets_',
+                 selected_receiver, '.pdf')
 pdf(pdfname, width=12, height = 8)
 
 for(ntop in c(100, 200, 300))
 {
   # ntop = 200
   cat('top LR -- ', ntop, '\n')
-  test = res[c(1:ntop), ]
   
+  if(nrow(res) < ntop){
+    test = res
+  }else{
+    test = res[c(1:ntop), ]
+  }
+  
+  #test = res[c(1:ntop), ]
   # test = test[-which(test$ligand == 'SPON1'), ] ## because one gene can't be both ligand and receptor
   # https://github.com/msraredon/Connectome/issues/8
   jj = which(test$ligand == 'RGMB'|test$receptor == 'RGMB'|
@@ -582,10 +588,6 @@ for(ntop in c(100, 200, 300))
   if(length(jj)>0){
     test = test[-jj, ]
   }
-  
-  #cells.of.interest = unique(c(test$source, test$target))
-  #cell_color = randomcoloR::distinctColorPalette(length(cells.of.interest))
-  #names(cell_color) <- cells.of.interest
   
   my_CircosPlot(test, 
                 weight.attribute = 'weight_norm',
@@ -962,6 +964,7 @@ for(es_cut in seq(1, 3, by = 1))
           legend.text = element_text(size = 8))
   
   plot(p1)
+  
   #ggsave(paste0(resDir, "axolotl_nm_subtype_correlationAnalysis.pdf"), width=8, height=6, dpi=300)
   
 }
