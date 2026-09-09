@@ -404,18 +404,15 @@ manual_ligands = readxl::read_xlsx('../geneLIANA-efiltered-excludedECMstructural
 manual_ligands$gene[which(manual_ligands$gene == 'FREM1')] = "FRAS1_FREM1_NPNT"
 manual_ligands$gene[which(manual_ligands$gene == 'FREM2')] = "FRAS1_FREM2_NPNT"
 
-
-#res = readRDS(file = paste0(outDir, '/res_lianaTest_for_circosplot.rds'))
-
 celltypes = unique(as.character(aa$celltypes))
 receivers = celltypes
 
 ##########################################
 # make plots for selected receivers
 ##########################################
-selected_receiver = 'Mac'
+#selected_receiver = 'Mac'
 
-#selected_receiver = 'Neu'
+selected_receiver = 'Neu'
 
 ## first plot in BL
 sender_cells = celltypes[grep('BL', celltypes)]
@@ -456,19 +453,18 @@ ligands_BL = manual_ligands$gene[which(manual_ligands$`BL or CSD` == 'BL')]
 mm = match(ligands_BL, res$ligand)
 xx_bl = res[!is.na(match(res$ligand, ligands_BL)), ]
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_manualSelectedLigands_immunTargets_, ',
-                 selected_receiver, '.pdf')
-pdf(pdfname, width=12, height = 8)
-my_CircosPlot(xx_bl, 
-              weight.attribute = 'weight_norm',
-              cols.use = cell_color,
-              sources.include = cells.of.interest,
-              targets.include = cells.of.interest,
-              lab.cex = 0.5,
-              title = paste('LR manually selected'))
-
-dev.off()
-
+# pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_manualSelectedLigands_immunTargets_, ',
+#                  selected_receiver, '.pdf')
+# pdf(pdfname, width=12, height = 8)
+# my_CircosPlot(xx_bl, 
+#               weight.attribute = 'weight_norm',
+#               cols.use = cell_color,
+#               sources.include = cells.of.interest,
+#               targets.include = cells.of.interest,
+#               lab.cex = 0.5,
+#               title = paste('LR manually selected'))
+# 
+# dev.off()
 
 write.csv(res, file = paste0(outDir, '/LR_interactions_LIANA_tops_BL_all_', selected_receiver, '.csv'), 
           row.names = TRUE, quote = FALSE)
@@ -541,18 +537,18 @@ mm = match(ligands_CSD, res$ligand)
 
 xx_csd = res[!is.na(match(res$ligand, ligands_CSD)), ]
 
-pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_manualSelectedLigands_immuTargets_',
-                 selected_receiver, '.pdf')
-pdf(pdfname, width=12, height = 8)
-my_CircosPlot(xx_csd, 
-              weight.attribute = 'weight_norm',
-              cols.use = cell_color,
-              sources.include = cells.of.interest,
-              targets.include = cells.of.interest,
-              lab.cex = 0.5,
-              title = paste('LR manually selected'))
-
-dev.off()
+# pdfname = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_manualSelectedLigands_immuTargets_',
+#                  selected_receiver, '.pdf')
+# pdf(pdfname, width=12, height = 8)
+# my_CircosPlot(xx_csd, 
+#               weight.attribute = 'weight_norm',
+#               cols.use = cell_color,
+#               sources.include = cells.of.interest,
+#               targets.include = cells.of.interest,
+#               lab.cex = 0.5,
+#               title = paste('LR manually selected'))
+# 
+# dev.off()
 
 write.csv(res, file = paste0(outDir, '/LR_interactions_LIANA_tops_CSD_all_', selected_receiver, '.csv'), 
           row.names = TRUE, quote = FALSE)
