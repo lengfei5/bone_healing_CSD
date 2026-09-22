@@ -65,16 +65,18 @@ write.csv2(res, file = paste0(outDir, 'ilastik_segmentation_pct_closure_boneGap_
 # for 2nd run, merge the manual cropping and automatic running 
 ##########################################
 outDir = paste0("/groups/tanaka/People/current/jiwang/projects/image_analysis/",
-                "axolotl_limb_CSD/export_aug2026/4w_LNPtreated_07082026/results")
+                #"axolotl_limb_CSD/export_aug2026/4w_LNPtreated_07082026/results")
                 #"axolotl_limb_CSD/export_aug2026/4w_LNP_AA_19052026/results")
+                "axolotl_limb_CSD/export_aug2026/4w_LNPtreated_gapMeasure_100926/results")
 
-res = read.csv(file = paste0(outDir, "/ilastik_segmentation_pct_closure.csv"), 
+res = read.csv2(file = paste0(outDir, "/ilastik_segmentation_pct_closure_addedManualCropping_manualCorrect.csv"), 
                header = TRUE, row.names = c(1))
 
 files = list.files(path = outDir, 
                    pattern = '*.csv', full.names = TRUE)
+
 ff = basename(files)
-files = files[which(basename(files) != 'ilastik_segmentation_pct_closure.csv')]
+files = files[which(basename(files) != 'ilastik_segmentation_pct_closure_addedManualCropping_manualCorrect.csv')]
 
 for(n in 1:length(files))
 {
@@ -90,9 +92,9 @@ for(n in 1:length(files))
   }else{
     cat('Error in image -- ', n, '--', x$image, '\n')
   }
-  
 }
 
-write.csv2(res, file = paste0(outDir, '/ilastik_segmentation_pct_closure_addedManualCropping.csv'), 
+write.csv2(res, file = paste0(outDir, 
+                              '/ilastik_segmentation_pct_closure_addedManualCropping_manualCorrect_v2.csv'), 
            row.names = TRUE, quote = FALSE)
 
