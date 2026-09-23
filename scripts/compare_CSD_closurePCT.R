@@ -126,7 +126,7 @@ crops = read.csv2(file = paste0(outDir, 'HCR_crop_coordinates.csv'), header = TR
 
 for(n in 1:length(files))
 {
-  # n = 1
+  # n = 2
   cat(n, ' -- ', basename(files[n]), '\n')
   
   file_name = gsub('_parameterCollection_HCRintensity.csv', '', basename(files[n]))
@@ -140,18 +140,20 @@ for(n in 1:length(files))
   
   
   x$area_mask = log10(x$area_mask)
+  x$intensity_hcr = log10(x$intensity_mean_hcr) 
+  x$intensity_prrx = log10(x$intensity_mean_cellmarker)
+  x_lims = max(x$centroid.1_mask)
+  y_lims = max(x$centroid.0_mask)
   
-  plot(x$eccentricity_mask, x$solidity_mask)
-  plot(log10(x$area_mask), x$eccentricity_mask)
+  
+  #plot(x$eccentricity_mask, x$solidity_mask)
+  plot(x$area_mask, x$eccentricity_mask, cex = 0.5)
   abline(v = 3, col = 'red')
   
   # filter cells with size
-  sels = which(x$area_mask > 10^3)
+  sels = which(x$area_mask > 3)
   cat(' nb of cells after size filtering :', length(sels), '\n')
   x = x[sels, ]
-  
-  x$intensity_hcr = log10(x$intensity_mean_hcr) 
-  x$intensity_prrx = log10(x$intensity_mean_cellmarker)
   
   ggplot() +
     geom_point(data = data.frame(x), mapping = aes(x = centroid.1_mask, y = centroid.0_mask, 
@@ -162,9 +164,6 @@ for(n in 1:length(files))
     theme_bw() + 
     ggtitle('cells after size filtering')
   
-  
-  x_lims = max(x$centroid.1_mask)
-  y_lims = max(x$centroid.0_mask)
   
   plot(x$intensity_prrx, log10(x$intensity_mean_dapi), cex = 0.2)
   prrx_cutoff = 3.0
@@ -179,20 +178,28 @@ for(n in 1:length(files))
   
   
   kk = grep(gsub("_parameterCollection_HCRintensity.csv", '', basename(files[n])), crops$file)
-  coord_xy = ceiling(as.numeric(crops[kk, c(2:ncol(crops))])/0.061810168997668995)
+  coord_xy = ceiling(as.numeric(crops[kk, c(2:9)])/0.061810168997668995)
   coord_x = coord_xy[c(1, 3, 5, 7)]
   coord_y = coord_xy[c(2, 4, 6, 8)]
   cat(coord_x)
   cat(coord_y, '\n')
   
+  # for n = 13
+  coord_x = c(12982, 8875, 60697, 60361)
+  coord_y = c(6374, 13318, 7009, 15783)
+  
+  # for n = 2
+  coord_x = c(6954, 4845, 47689, 46331)
+  coord_y = c(7196, 16643, 2342, 12367)
+ 
   
   # select points inside a rectangle defined by four corners from GPT
   library(sf)
-  
+  resize_factor = 1
   # Four rectangle corners; order does not matter
   corners <- data.frame(
-    x = as.numeric(coord_x[c(1,2,4,3)]*3),
-    y = as.numeric(coord_y[c(1,2,4,3)]*3)
+    x = as.numeric(coord_x[c(1,2, 4, 3)]*resize_factor),
+    y = as.numeric(coord_y[c(1,2, 4, 3)]*resize_factor)
   )
   
   ggplot() +
