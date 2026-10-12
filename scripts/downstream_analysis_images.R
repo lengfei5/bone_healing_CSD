@@ -115,29 +115,37 @@ library(pheatmap)
 library(RColorBrewer)
 library("viridis")
 
-outDir = "/groups/tanaka/People/current/jiwang/projects/image_analysis/axolotl_limb_CSD/HCR_Kazald1/"
+inputDir = paste0("/groups/tanaka/People/current/jiwang/projects/image_analysis/axolotl_limb_CSD/", 
+                  "HCR_Kazald1/images_processed/cellmasks_cellpose_imageJmacro/features_collected")
 
-files = list.files(path = paste0(outDir, 'results'), 
+outDir = paste0("/groups/tanaka/People/current/jiwang/projects/image_analysis/axolotl_limb_CSD/HCR_Kazald1/",
+                "results/imageJcellpose_mask/")
+
+if(!dir.exists(outDir)){
+  dir.create(outDir)
+}
+
+files = list.files(path = inputDir, 
                    pattern = '*.csv', full.names = TRUE)
 
 ff = basename(files)
 
-crops = read.csv2(file = paste0(outDir, 'HCR_crop_coordinates.csv'), header = TRUE)
+
+crops = data.frame(readxl::read_xlsx(path = paste0("/groups/tanaka/People/current/jiwang/projects/image_analysis/axolotl_limb_CSD/HCR_Kazald1/", 
+                                                   'coordinates_HCR_230926.xlsx'), sheet = 1,
+                          col_names = TRUE))
+
 
 for(n in 1:length(files))
 {
-  # n = 2
-  cat(n, ' -- ', basename(files[n]), '\n')
-  
+  # n = 1
   file_name = gsub('_parameterCollection_HCRintensity.csv', '', basename(files[n]))
+  
+  cat(n, ' -- ', file_name, '\n')
   
   x = read.csv(file = files[n], header = TRUE, row.names = c(1))
   
   cat(' nb of cells detected before filtering :', nrow(x), '\n')
-  
-  pdfname = paste0(outDir, '/results/', file_name, 'cell_selection_HCR_quanty_projection.pdf')
-  pdf(pdfname, width=12, height = 8)
-  
   
   x$area_mask = log10(x$area_mask)
   x$intensity_hcr = log10(x$intensity_mean_hcr) 
@@ -145,15 +153,22 @@ for(n in 1:length(files))
   x_lims = max(x$centroid.1_mask)
   y_lims = max(x$centroid.0_mask)
   
+  kk = grep(file_name, crops$file)
+  
+  pdfname = paste0(outDir, '/results/', file_name, 'cell_selection_HCR_quanty_projection.pdf')
+  pdf(pdfname, width=12, height = 8)
+  
   
   #plot(x$eccentricity_mask, x$solidity_mask)
   plot(x$area_mask, x$eccentricity_mask, cex = 0.5)
-  abline(v = 3, col = 'red')
+  area_cutoff = crops$area_mask_cutoff[kk]
+  abline(v = area_cutoff, col = 'red')
   
   # filter cells with size
-  sels = which(x$area_mask > 3)
+  sels = which(x$area_mask > area_cutoff)
   cat(' nb of cells after size filtering :', length(sels), '\n')
   x = x[sels, ]
+  
   
   ggplot() +
     geom_point(data = data.frame(x), mapping = aes(x = centroid.1_mask, y = centroid.0_mask, 
@@ -166,8 +181,8 @@ for(n in 1:length(files))
   
   
   plot(x$intensity_prrx, log10(x$intensity_mean_dapi), cex = 0.2)
-  prrx_cutoff = 3.0
-  dapi_cutoff = 3.0
+  prrx_cutoff = crops$Prrx_intensity_cutoff[kk]
+  dapi_cutoff = crops$Dapi_intensity_cutoff[kk]
   abline(v = prrx_cutoff, col = 'red')
   abline(h = dapi_cutoff, col = 'red')
   
@@ -177,29 +192,19 @@ for(n in 1:length(files))
   x = x[sels, ]
   
   
-  kk = grep(gsub("_parameterCollection_HCRintensity.csv", '', basename(files[n])), crops$file)
-  coord_xy = ceiling(as.numeric(crops[kk, c(2:9)])/0.061810168997668995)
+  coord_xy = ceiling(as.numeric(crops[kk, c(2:9)]))
   coord_x = coord_xy[c(1, 3, 5, 7)]
   coord_y = coord_xy[c(2, 4, 6, 8)]
   cat(coord_x)
   cat(coord_y, '\n')
   
-  # for n = 13
-  coord_x = c(12982, 8875, 60697, 60361)
-  coord_y = c(6374, 13318, 7009, 15783)
-  
-  # for n = 2
-  coord_x = c(6954, 4845, 47689, 46331)
-  coord_y = c(7196, 16643, 2342, 12367)
- 
-  
   # select points inside a rectangle defined by four corners from GPT
   library(sf)
-  resize_factor = 1
+  #resize_factor = 1
   # Four rectangle corners; order does not matter
   corners <- data.frame(
-    x = as.numeric(coord_x[c(1,2, 4, 3)]*resize_factor),
-    y = as.numeric(coord_y[c(1,2, 4, 3)]*resize_factor)
+    x = as.numeric(coord_x[c(1,2, 4, 3)]),
+    y = as.numeric(coord_y[c(1,2, 4, 3)])
   )
   
   ggplot() +
@@ -213,7 +218,7 @@ for(n in 1:length(files))
     theme_bw() +
     ggtitle('cells after Prxx and dapi filtering') +
     geom_polygon(data = corners, aes(x = x, y = y),
-                 fill = "orange", alpha = 0.3, color = "black")
+                 fill = "orange", alpha = 0.3, color = "magenta")
   
   # Order corners around their centroid
   center_x <- mean(corners$x)
@@ -325,21 +330,21 @@ for(n in 1:length(files))
   
   ggplot(data.frame(x), aes(project, intensity_hcr)) +
     geom_point() +
-    geom_smooth(span = 0.5, formula = 'y ~ x') +
+    geom_smooth(span = 0.6, formula = 'y ~ x', method = 'loess') +
     theme_classic() +
     ggtitle('all cells within regions')
   
-  
   xx = x[which(x$project > 0.1 & x$project < 0.9), ]
+  
   ggplot(data.frame(xx), aes(project, intensity_hcr)) +
     geom_point() +
-    geom_smooth(span = 0.5, formula = 'y ~ x') +
-    theme_classic() +
+    geom_smooth(span = 0.6, formula = 'y ~ x', method = 'loess') +
+    theme_classic() + 
+    xlim(0, 1) + 
     ggtitle('cells without borders')
   
   dev.off()
   
+  
 }
-
-
 
