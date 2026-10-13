@@ -114,6 +114,7 @@ library(ggplot2)
 library(pheatmap)
 library(RColorBrewer)
 library("viridis")
+library(sf)
 
 inputDir = paste0("/groups/tanaka/People/current/jiwang/projects/image_analysis/axolotl_limb_CSD/", 
                   "HCR_Kazald1/images_processed/cellmasks_cellpose_imageJmacro/features_collected")
@@ -129,17 +130,41 @@ files = list.files(path = inputDir,
                    pattern = '*.csv', full.names = TRUE)
 
 ff = basename(files)
+ff = gsub('_parameterCollection_HCRintensity.csv', '', ff)
+ff = sapply(ff, function(x){unlist(strsplit(x, '-'))[1]})
 
 
 crops = data.frame(readxl::read_xlsx(path = paste0("/groups/tanaka/People/current/jiwang/projects/image_analysis/axolotl_limb_CSD/HCR_Kazald1/", 
                                                    'coordinates_HCR_230926.xlsx'), sheet = 1,
                           col_names = TRUE))
 
+names = crops$file
+names = sapply(names, function(x){x = unlist(strsplit(x, '_')); paste0(x[c(1:(length(x)-2))], 
+                                                                       collapse = '_')})
+
+names[1] = "11d_LNP3_20x_limb1"
+names[5] ="11d_LNP4_limb3"
+names[which(names == "11d_LNP4_limb3")] = "11d_LNP4_20x_limb3"
+names[which(names == "11dpi_LNP1_20x")] = "11dpi_LNP1_20x_an1"
+
+mm = match(ff, names)
+
+ff[which(is.na(match(ff, names)))]
+names[which(is.na(match(names, ff)))]
+
+crops$oldFile = crops$file
+crops$file[mm] = ff
+
+area_cutoff = 3.8
+prrx_cutoff = 3.0
+dapi_cutoff = 3.0
 
 for(n in 1:length(files))
 {
-  # n = 1
+  # n = 3
+  
   file_name = gsub('_parameterCollection_HCRintensity.csv', '', basename(files[n]))
+  file_name = unlist(strsplit(file_name, '-'))[1]
   
   cat(n, ' -- ', file_name, '\n')
   
@@ -153,15 +178,16 @@ for(n in 1:length(files))
   x_lims = max(x$centroid.1_mask)
   y_lims = max(x$centroid.0_mask)
   
-  kk = grep(file_name, crops$file)
+  kk = which(crops$file == file_name)
+  cat(kk, 'th line of file in crop coordinates \n')
   
-  pdfname = paste0(outDir, '/results/', file_name, 'cell_selection_HCR_quanty_projection.pdf')
+  
+  pdfname = paste0(outDir, file_name, 'cell_selection_HCR_quanty_projection.pdf')
   pdf(pdfname, width=12, height = 8)
-  
   
   #plot(x$eccentricity_mask, x$solidity_mask)
   plot(x$area_mask, x$eccentricity_mask, cex = 0.5)
-  area_cutoff = crops$area_mask_cutoff[kk]
+  #area_cutoff = crops$area_mask_cutoff[kk]
   abline(v = area_cutoff, col = 'red')
   
   # filter cells with size
@@ -179,10 +205,9 @@ for(n in 1:length(files))
     theme_bw() + 
     ggtitle('cells after size filtering')
   
-  
   plot(x$intensity_prrx, log10(x$intensity_mean_dapi), cex = 0.2)
-  prrx_cutoff = crops$Prrx_intensity_cutoff[kk]
-  dapi_cutoff = crops$Dapi_intensity_cutoff[kk]
+  #prrx_cutoff = crops$Prrx_intensity_cutoff[kk]
+  #dapi_cutoff = crops$Dapi_intensity_cutoff[kk]
   abline(v = prrx_cutoff, col = 'red')
   abline(h = dapi_cutoff, col = 'red')
   
@@ -199,7 +224,7 @@ for(n in 1:length(files))
   cat(coord_y, '\n')
   
   # select points inside a rectangle defined by four corners from GPT
-  library(sf)
+ 
   #resize_factor = 1
   # Four rectangle corners; order does not matter
   corners <- data.frame(
