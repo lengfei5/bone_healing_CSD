@@ -116,6 +116,42 @@ library(RColorBrewer)
 library("viridis")
 library(sf)
 
+project_to_line <- function(points, A, B) {
+  points <- as.matrix(points)
+  A <- as.numeric(A)
+  B <- as.numeric(B)
+  
+  direction <- B - A
+  denominator <- sum(direction^2)
+  
+  if (denominator == 0) {
+    stop("A and B must be different points.")
+  }
+  
+  # Subtract A from every point
+  relative <- sweep(points, 2, A, FUN = "-")
+  
+  # Position of each projection along line A -> B
+  t <- as.vector(relative %*% direction / denominator)
+  
+  # Projected x-y coordinates
+  projected <- sweep(
+    outer(t, direction),
+    2,
+    A,
+    FUN = "+"
+  )
+  
+  colnames(projected) <- c("x_projected", "y_projected")
+  
+  data.frame(
+    points,
+    t = t,
+    projected
+  )
+}
+
+
 inputDir = paste0("/groups/tanaka/People/current/jiwang/projects/image_analysis/axolotl_limb_CSD/", 
                   "HCR_Kazald1/images_processed/cellmasks_cellpose_imageJmacro/features_collected")
 
@@ -159,9 +195,12 @@ area_cutoff = 3.8
 prrx_cutoff = 3.0
 dapi_cutoff = 3.0
 
+
+keep = c()
 for(n in 1:length(files))
+#for(n in 1:2)
 {
-  # n = 3
+  # n = 1
   
   file_name = gsub('_parameterCollection_HCRintensity.csv', '', basename(files[n]))
   file_name = unlist(strsplit(file_name, '-'))[1]
@@ -196,7 +235,7 @@ for(n in 1:length(files))
   x = x[sels, ]
   
   
-  ggplot() +
+  p1 = ggplot() +
     geom_point(data = data.frame(x), mapping = aes(x = centroid.1_mask, y = centroid.0_mask, 
                                        fill = intensity_hcr), 
                shape = 21, size = 2) +
@@ -204,6 +243,8 @@ for(n in 1:length(files))
     scale_fill_viridis_c(option = "magma") + 
     theme_bw() + 
     ggtitle('cells after size filtering')
+  
+  plot(p1)
   
   plot(x$intensity_prrx, log10(x$intensity_mean_dapi), cex = 0.2)
   #prrx_cutoff = crops$Prrx_intensity_cutoff[kk]
@@ -232,7 +273,7 @@ for(n in 1:length(files))
     y = as.numeric(coord_y[c(1,2, 4, 3)])
   )
   
-  ggplot() +
+  p2 = ggplot() +
     geom_point(data = data.frame(x), mapping = aes(x = centroid.1_mask, y = centroid.0_mask, 
                                                    fill = intensity_hcr), 
                shape = 21, size = 2) +
@@ -244,6 +285,8 @@ for(n in 1:length(files))
     ggtitle('cells after Prxx and dapi filtering') +
     geom_polygon(data = corners, aes(x = x, y = y),
                  fill = "orange", alpha = 0.3, color = "magenta")
+  
+  plot(p2)
   
   # Order corners around their centroid
   center_x <- mean(corners$x)
@@ -289,7 +332,7 @@ for(n in 1:length(files))
   cat(' nb of cells detected within the cropping rectangle  :', nrow(x), '\n')
   
   
-  ggplot() +
+  p3 = ggplot() +
     geom_point(data = data.frame(x), mapping = aes(x = centroid.1_mask, y = centroid.0_mask, 
                                                    fill = intensity_hcr), 
                shape = 21, size = 2) +
@@ -302,43 +345,9 @@ for(n in 1:length(files))
     geom_polygon(data = corners, aes(x = x, y = y),
                  fill = "orange", alpha = 0.3, color = "magenta")
   
+  plot(p3)
   
   ## project all points to the line defined by the two centers
-  project_to_line <- function(points, A, B) {
-    points <- as.matrix(points)
-    A <- as.numeric(A)
-    B <- as.numeric(B)
-    
-    direction <- B - A
-    denominator <- sum(direction^2)
-    
-    if (denominator == 0) {
-      stop("A and B must be different points.")
-    }
-    
-    # Subtract A from every point
-    relative <- sweep(points, 2, A, FUN = "-")
-    
-    # Position of each projection along line A -> B
-    t <- as.vector(relative %*% direction / denominator)
-    
-    # Projected x-y coordinates
-    projected <- sweep(
-      outer(t, direction),
-      2,
-      A,
-      FUN = "+"
-    )
-    
-    colnames(projected) <- c("x_projected", "y_projected")
-    
-    data.frame(
-      points,
-      t = t,
-      projected
-    )
-  }
-  
   points <- data.frame(
     x = x$centroid.1_mask,
     y = x$centroid.0_mask
@@ -353,11 +362,13 @@ for(n in 1:length(files))
   x$project = result$t
   #plot(x$project, x$intensity_hcr)
   
-  ggplot(data.frame(x), aes(project, intensity_hcr)) +
+  p4 = ggplot(data.frame(x), aes(project, intensity_hcr)) +
     geom_point() +
     geom_smooth(span = 0.6, formula = 'y ~ x', method = 'loess') +
     theme_classic() +
     ggtitle('all cells within regions')
+  
+  plot(p4)
   
   xx = x[which(x$project > 0.1 & x$project < 0.9), ]
   
@@ -368,8 +379,48 @@ for(n in 1:length(files))
     xlim(0, 1) + 
     ggtitle('cells without borders')
   
+  
   dev.off()
   
+  x$sample = file_name
+  
+  keep = rbind(keep, x[, match(c('sample', 'project', 'intensity_hcr'), colnames(x))])
   
 }
+
+write.csv2(keep, file = paste0(outDir, 'image_hcrIntensity_gapProjection.csv'), 
+           sep = '\t', col.names = TRUE, row.names = FALSE)
+
+
+
+xx = keep[grep('_LNP2_|_LNP3_|_LNP4_', keep$sample), ]
+xx$LNP = sapply(xx$sample, function(x){unlist(strsplit(x, '_'))[2]})
+
+ggplot(data.frame(xx), aes(x = project, y = intensity_hcr, group = sample, colour = LNP)) +
+  #geom_point(size = 0.01)  + 
+  theme_classic() +  
+  theme(axis.text.x = element_text(angle = 0, size = 12, vjust = 0.4),
+        axis.text.y = element_text(angle = 0, size = 12)) +
+  labs( x = 'Relative Position in CSD gap', y = 'HCR intensity' ) +
+  xlim(0, 1) +
+  geom_smooth(span = 0.6, formula = 'y ~ x', method = 'loess', se = FALSE) 
+  
+ggsave(filename = paste0(outDir, 'hcrIntensity_gapProjection_LNP234.pdf'), 
+       width = 8, height = 4)
+
+
+xx = keep
+xx$LNP = sapply(xx$sample, function(x){unlist(strsplit(x, '_'))[2]})
+
+ggplot(data.frame(xx), aes(x = project, y = intensity_hcr, group = sample, colour = LNP)) +
+  #geom_point(size = 0.01)  + 
+  theme_classic() +  
+  theme(axis.text.x = element_text(angle = 0, size = 12, vjust = 0.4),
+        axis.text.y = element_text(angle = 0, size = 12)) +
+  labs( x = 'Relative Position in CSD gap', y = 'HCR intensity' ) +
+  xlim(0, 1) +
+  geom_smooth(span = 0.6, formula = 'y ~ x', method = 'loess', se = FALSE) 
+
+ggsave(filename = paste0(outDir, 'hcrIntensity_gapProjection_LNPall.pdf'), 
+       width = 8, height = 4)
 
