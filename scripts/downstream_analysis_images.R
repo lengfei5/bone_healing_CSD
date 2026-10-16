@@ -424,3 +424,36 @@ ggplot(data.frame(xx), aes(x = project, y = intensity_hcr, group = sample, colou
 ggsave(filename = paste0(outDir, 'hcrIntensity_gapProjection_LNPall.pdf'), 
        width = 8, height = 4)
 
+
+
+
+########################################################
+########################################################
+# Section III: some statistical test
+# 
+########################################################
+########################################################
+rm(list = ls())
+res = read.csv2(file = paste0("../tables/gap-closure_4w_AA_ALL_new-old_quantified_ilastik.csv"),
+               header = TRUE)
+
+df_long <- pivot_longer(
+  res,
+  cols = everything(),             # Convert all columns except gene
+  names_to = "condition",   # Column names become conditions
+  values_to = "proportion",  # Values become expression
+  values_drop_na = TRUE
+)
+
+ggplot(df_long, aes(x = condition, y = proportion)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.15, alpha = 0.5, size = 1) +
+  theme_classic() +
+  labs(x = NULL, y = "Value")
+
+xx = df_long[which(df_long$condition == "Wnt3a.Gfp"| df_long$condition == 'Wnt3a.Wnt5a.Gfp'), ]
+
+wilcox.test(x = df_long$proportion[which(df_long$condition =="Wnt3a.Gfp")], 
+            y = df_long$proportion[which(df_long$condition =='Wnt3a.Wnt5a.Gfp')], 
+            exact = TRUE, alternative = c('greater'))
+
