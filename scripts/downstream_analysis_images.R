@@ -434,6 +434,8 @@ ggsave(filename = paste0(outDir, 'hcrIntensity_gapProjection_LNPall.pdf'),
 ########################################################
 ########################################################
 rm(list = ls())
+setwd("/groups/tanaka/People/current/jiwang/projects/")
+
 res = read.csv2(file = paste0("../tables/gap-closure_4w_AA_ALL_new-old_quantified_ilastik.csv"),
                header = TRUE)
 
