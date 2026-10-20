@@ -434,8 +434,17 @@ ggsave(filename = paste0(outDir, 'hcrIntensity_gapProjection_LNPall.pdf'),
 ########################################################
 ########################################################
 rm(list = ls())
-setwd("/groups/tanaka/People/current/jiwang/projects/")
+setwd("/groups/tanaka/People/current/jiwang/projects/bone_healing_CSD/scripts")
 
+library(dplyr)
+library(tibble)
+library(tidyr)
+library(patchwork)
+library(ggplot2)
+
+##########################################
+# first table test
+##########################################
 res = read.csv2(file = paste0("../tables/gap-closure_4w_AA_ALL_new-old_quantified_ilastik.csv"),
                header = TRUE)
 
@@ -453,9 +462,136 @@ ggplot(df_long, aes(x = condition, y = proportion)) +
   theme_classic() +
   labs(x = NULL, y = "Value")
 
-xx = df_long[which(df_long$condition == "Wnt3a.Gfp"| df_long$condition == 'Wnt3a.Wnt5a.Gfp'), ]
+#xx = df_long[which(df_long$condition == "Wnt3a.Gfp"| df_long$condition == 'Wnt3a.Wnt5a.Gfp'), ]
 
-wilcox.test(x = df_long$proportion[which(df_long$condition =="Wnt3a.Gfp")], 
-            y = df_long$proportion[which(df_long$condition =='Wnt3a.Wnt5a.Gfp')], 
-            exact = TRUE, alternative = c('greater'))
+cc = unique(df_long$condition)
+
+compares = data.frame(c1 = c(rep("Wnt3a.Lef1.Gfp", 4),   "Wnt3a.Gfp"),
+                      c2 = c("Gfp", "Wnt5a.Gfp", "Tgfb.Inhba.Gfp", "Wnt3a.Gfp", "Gfp"), 
+                      pval = NA)
+
+for(n in 1:nrow(compares))
+{
+  # n = 1
+  test = wilcox.test(x = df_long$proportion[which(df_long$condition ==compares$c1[n])], 
+              y = df_long$proportion[which(df_long$condition ==compares$c2[n])], 
+              exact = FALSE, 
+              alternative = c('greater'))
+ 
+  compares$pval[n] = test$p.value 
+}
+
+x = df_long$proportion[which(df_long$condition =="Wnt3a.Lef1.Gfp")]
+y = df_long$proportion[which(df_long$condition =="Wnt3a.Gfp")]
+
+ks.test(x = x, y = y, alternative = c('less'))
+kSamples::ad.test(x, y)
+twosamples::cvm_test(x, y)
+
+# for some reason, the coin package makes you make the 'group' column/variable a factor
+df = df_long[which(df_long$condition == "Wnt3a.Lef1.Gfp" | df_long$condition == "Wnt3a.Gfp"), ]
+df$condition = factor(df$condition, levels = c("Wnt3a.Lef1.Gfp", "Wnt3a.Gfp"))
+
+library(coin)
+independence_test(proportion ~ condition, data = df, alternative = "greater")
+
+write.csv2(compares, file = "../tables/gap-closure_4w_AA_ALL_new-old_quantified_ilastik_wilcoxTest.csv")
+
+##########################################
+# second test
+##########################################
+res = read.csv2(file = paste0("../tables/2wEdU_of_DAPI_LNPtreated.csv"),
+                header = TRUE)
+
+df_long <- pivot_longer(
+  res,
+  cols = everything(),             # Convert all columns except gene
+  names_to = "condition",   # Column names become conditions
+  values_to = "proportion",  # Values become expression
+  values_drop_na = TRUE
+)
+
+ggplot(df_long, aes(x = condition, y = proportion)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.15, alpha = 0.5, size = 1) +
+  theme_classic() +
+  labs(x = NULL, y = "Value")
+
+#xx = df_long[which(df_long$condition == "Wnt3a.Gfp"| df_long$condition == 'Wnt3a.Wnt5a.Gfp'), ]
+
+cc = unique(df_long$condition)
+
+compares = data.frame(c1 = c(rep("blastema", 8),  rep("X.W3aGFP", 8), rep("X.W3aL1GFP", 8)), 
+                      c2 = c(cc[which(cc != "blastema")], cc[which(cc != "X.W3aGFP")], 
+                             cc[which(cc != "X.W3aL1GFP")]), 
+                      pval = NA)
+
+for(n in 1:nrow(compares))
+{
+  # n = 1
+  test = wilcox.test(x = df_long$proportion[which(df_long$condition ==compares$c1[n])], 
+                     y = df_long$proportion[which(df_long$condition ==compares$c2[n])], 
+                     exact = FALSE, 
+                     alternative = c("two.sided"))
+  
+  compares$pval[n] = test$p.value 
+}
+
+ks.test(x = df_long$proportion[which(df_long$condition =="Wnt3a.Lef1.Gfp")], 
+        y = df_long$proportion[which(df_long$condition =="Wnt3a.Gfp")]
+        #alternative = c('greater')
+)
+
+write.csv2(compares, file = "../tables/2wEdU_of_DAPI_LNPtreated_wilcoxTest.csv")
+
+
+##########################################
+# third test 
+##########################################
+res = readxl::read_xlsx(path = paste0("../tables/11092026EdUofCherry_v2.xlsx"),
+                col_names = TRUE, sheet = 1)
+
+res = res[which(res$proportions != ' ' & !is.na(res$proportions)), ]
+
+res = res[which(res$sample != 'intact'), ]
+
+res$sample = gsub(' ', '_', res$sample)
+res$sample = gsub('blastema', 'bl', res$sample)
+res$sample = gsub('csd', 'CSD_', res$sample)
+
+ggplot(res, aes(x=as.factor(proportions), fill=as.factor(sample) )) +
+  geom_bar() +
+  #geom_jitter(width = 0.15, alpha = 0.5, size = 1) +
+  theme_classic() +
+  labs(x = NULL, y = "Value")
+
+#xx = df_long[which(df_long$condition == "Wnt3a.Gfp"| df_long$condition == 'Wnt3a.Wnt5a.Gfp'), ]
+
+res$condition = factor(res$sample)
+cc = unique(res$condition)
+
+df_long = res
+df_long$proportion = df_long$proportions
+
+compares = data.frame(c1 = c("bl_1w", "bl_2w", "bl_3w"), 
+                      c2 = c("CSD_1w", "CSD_2w", "CSD_3w"), 
+                      pval = NA)
+
+for(n in 1:nrow(compares))
+{
+  # n = 1
+  test = wilcox.test(x = df_long$proportion[which(df_long$condition ==compares$c1[n])], 
+                     y = df_long$proportion[which(df_long$condition ==compares$c2[n])], 
+                     exact = FALSE, 
+                     alternative = c("two.sided"))
+  
+  compares$pval[n] = test$p.value 
+}
+
+ks.test(x = df_long$proportion[which(df_long$condition =="Wnt3a.Lef1.Gfp")], 
+        y = df_long$proportion[which(df_long$condition =="Wnt3a.Gfp")]
+        #alternative = c('greater')
+)
+
+write.csv2(compares, file = "../tables/11092026EdUofCherry_wilcoxTest.csv")
 
