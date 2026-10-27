@@ -116,6 +116,24 @@ ggsave(filename = paste0(resDir, '/UMAP_merged.BL.CSD_celltypes_split.by.sample.
 saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs_umap.rds'))
 
 
+saveFile_forBonsai = FALSE
+if(saveFile_forBonsai){
+  
+  counts = ct@assays$RNA@counts
+  counts = data.frame(GeneID = rownames(counts), as.matrix(counts), stringsAsFactors = FALSE)
+  
+  write.table(counts, file = paste0(resDir, '/data_4Bonsai/CMs_countTable_4Bonsai.tsv'),
+              row.names = FALSE, col.names = TRUE, quote = FALSE, sep = '\t')
+  
+  metadata = ct@meta.data
+  metadata = data.frame(CellID = rownames(metadata), metadata)
+  
+  write.table(metadata, file = paste0(resDir, '/data_4Bonsai/CMs_annotation_4Bonsai.tsv'),
+              row.names = FALSE, col.names = TRUE, quote = FALSE, sep = '\t')
+  
+}
+
+
 ##########################################
 # subset relevant cell populations:
 # connective tissue, epidermis, macrophage, neutrophils

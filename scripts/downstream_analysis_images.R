@@ -106,6 +106,8 @@ write.csv2(res, file = paste0(outDir,
 # 
 ########################################################
 ########################################################
+rm(list = ls())
+
 library(dplyr)
 library(tibble)
 library(tidyr)
@@ -195,12 +197,12 @@ area_cutoff = 3.8
 prrx_cutoff = 3.0
 dapi_cutoff = 3.0
 
-
 keep = c()
+
 for(n in 1:length(files))
 #for(n in 1:2)
 {
-  # n = 1
+  # n = 14
   
   file_name = gsub('_parameterCollection_HCRintensity.csv', '', basename(files[n]))
   file_name = unlist(strsplit(file_name, '-'))[1]
@@ -214,6 +216,7 @@ for(n in 1:length(files))
   x$area_mask = log10(x$area_mask)
   x$intensity_hcr = log10(x$intensity_mean_hcr) 
   x$intensity_prrx = log10(x$intensity_mean_cellmarker)
+  x$intensity_gfp = log10(x$intensity_mean_lnpGFP)
   x_lims = max(x$centroid.1_mask)
   y_lims = max(x$centroid.0_mask)
   
@@ -228,9 +231,14 @@ for(n in 1:length(files))
   plot(x$area_mask, x$eccentricity_mask, cex = 0.5)
   #area_cutoff = crops$area_mask_cutoff[kk]
   abline(v = area_cutoff, col = 'red')
+  abline(v = 4, col = 'red')
   
   # filter cells with size
+  #sels = which(x$area_mask > area_cutoff)
+  
   sels = which(x$area_mask > area_cutoff)
+  #sels = which(x$area_mask > 4 & x$eccentricity_mask < 0.8)
+  
   cat(' nb of cells after size filtering :', length(sels), '\n')
   x = x[sels, ]
   
@@ -246,13 +254,34 @@ for(n in 1:length(files))
   
   plot(p1)
   
+  p2 = ggplot() +
+    geom_point(data = data.frame(x), mapping = aes(x = centroid.1_mask, y = centroid.0_mask, 
+                                                   fill = intensity_gfp), 
+               shape = 21, size = 2) +
+    #scale_fill_viridis_c() + 
+    scale_fill_viridis_c(option = "magma") + 
+    theme_bw() + 
+    ggtitle('cells after size filtering')
+  
+  p1 + p2
+  
+  
   plot(x$intensity_prrx, log10(x$intensity_mean_dapi), cex = 0.2)
   #prrx_cutoff = crops$Prrx_intensity_cutoff[kk]
   #dapi_cutoff = crops$Dapi_intensity_cutoff[kk]
   abline(v = prrx_cutoff, col = 'red')
   abline(h = dapi_cutoff, col = 'red')
   
+  plot(x$intensity_gfp, x$intensity_prrx,  cex = 0.2)
+  #prrx_cutoff = crops$Prrx_intensity_cutoff[kk]
+  #dapi_cutoff = crops$Dapi_intensity_cutoff[kk]
+  abline(h = prrx_cutoff, col = 'red')
+  abline(h = dapi_cutoff, col = 'red')
+  
   sels = which(x$intensity_prrx > prrx_cutoff & log10(x$intensity_mean_dapi) > dapi_cutoff)
+  sels = which(x$intensity_prrx > prrx_cutoff & 
+                 log10(x$intensity_mean_dapi) > 3.2 &
+                 x$intensity_gfp > 3.2)
   cat(' nb of cells detected after Prxx and dapi filtering  :', length(sels), '\n')
   
   x = x[sels, ]
@@ -261,8 +290,13 @@ for(n in 1:length(files))
   coord_xy = ceiling(as.numeric(crops[kk, c(2:9)]))
   coord_x = coord_xy[c(1, 3, 5, 7)]
   coord_y = coord_xy[c(2, 4, 6, 8)]
-  cat(coord_x)
+  
+  cat(coord_x, '\n')
   cat(coord_y, '\n')
+  
+  # coord_x[2] = 4000
+  # coord_y[2] = 7500
+  # coord_y[4] = 10000
   
   # select points inside a rectangle defined by four corners from GPT
  
@@ -272,6 +306,12 @@ for(n in 1:length(files))
     x = as.numeric(coord_x[c(1,2, 4, 3)]),
     y = as.numeric(coord_y[c(1,2, 4, 3)])
   )
+  
+  # corners <- data.frame(
+  #   x = as.numeric(c(coord_x[c(1,2)], 30000, coord_x[c(4, 3)])),
+  #   y = as.numeric(c(coord_y[c(1,2)], 8000, coord_y[c(4, 3)]))
+  # )
+  # 
   
   p2 = ggplot() +
     geom_point(data = data.frame(x), mapping = aes(x = centroid.1_mask, y = centroid.0_mask, 
@@ -391,6 +431,13 @@ for(n in 1:length(files))
 write.csv2(keep, file = paste0(outDir, 'image_hcrIntensity_gapProjection.csv'), 
            sep = '\t', col.names = TRUE, row.names = FALSE)
 
+
+xx = keep
+keep = read.csv2(file = paste0(outDir, 'image_hcrIntensity_gapProjection.csv'), header = TRUE)
+
+keep = keep[which(keep$sample != "11dpi_LNP2_an2_20x"), ]
+
+keep = rbind(keep, xx)
 
 
 xx = keep[grep('_LNP2_|_LNP3_|_LNP4_', keep$sample), ]
