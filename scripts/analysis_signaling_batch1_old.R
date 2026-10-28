@@ -119,18 +119,22 @@ saveRDS(aa, file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs_umap.r
 saveFile_forBonsai = FALSE
 if(saveFile_forBonsai){
   
+  aa = readRDS(file = paste0(RdataDir, '/BL.CSD_merged_renormalized_8000HVGs_umap.rds'))
+  
+  ct = subset(aa, cells = colnames(aa)[which(aa$celltype == "connective tissue")])
+  
   counts = ct@assays$RNA@counts
   counts = data.frame(GeneID = rownames(counts), as.matrix(counts), stringsAsFactors = FALSE)
   
-  write.table(counts, file = paste0(resDir, '/data_4Bonsai/CMs_countTable_4Bonsai.tsv'),
+  write.table(counts, file = paste0(resDir, '/CMs_batch1_countTable_4Bonsai.tsv'),
               row.names = FALSE, col.names = TRUE, quote = FALSE, sep = '\t')
   
   metadata = ct@meta.data
   metadata = data.frame(CellID = rownames(metadata), metadata)
   
-  write.table(metadata, file = paste0(resDir, '/data_4Bonsai/CMs_annotation_4Bonsai.tsv'),
+  write.table(metadata, file = paste0(resDir, '/CMs_batch1_annotation_4Bonsai.tsv'),
               row.names = FALSE, col.names = TRUE, quote = FALSE, sep = '\t')
-  
+    
 }
 
 

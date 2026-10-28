@@ -158,7 +158,7 @@ inputDir = paste0("/groups/tanaka/People/current/jiwang/projects/image_analysis/
                   "HCR_Kazald1/images_processed/cellmasks_cellpose_imageJmacro/features_collected")
 
 outDir = paste0("/groups/tanaka/People/current/jiwang/projects/image_analysis/axolotl_limb_CSD/HCR_Kazald1/",
-                "results/imageJcellpose_mask/")
+                "results/imageJcellpose_mask_v2/")
 
 if(!dir.exists(outDir)){
   dir.create(outDir)
@@ -166,6 +166,10 @@ if(!dir.exists(outDir)){
 
 files = list.files(path = inputDir, 
                    pattern = '*.csv', full.names = TRUE)
+
+if(length(grep('removedLabelIDs', files)) > 0){
+  files = files[grep('removedLabelIDs', files, invert = TRUE)] 
+}
 
 ff = basename(files)
 ff = gsub('_parameterCollection_HCRintensity.csv', '', ff)
@@ -223,6 +227,16 @@ for(n in 1:length(files))
   kk = which(crops$file == file_name)
   cat(kk, 'th line of file in crop coordinates \n')
   
+  Discard_blood_cells = FALSE
+  if(n == 14){
+    blood = read.csv(file = paste0(inputDir, '/11dpi_LNP2_an3_20x-AiryStitch-14_removedLabelIDs.csv'),
+                     header = FALSE)
+    
+    mm = match(x$label_mask, blood$V1)
+    
+    x = x[which(is.na(mm)), ]
+    
+  }
   
   pdfname = paste0(outDir, file_name, 'cell_selection_HCR_quanty_projection.pdf')
   pdf(pdfname, width=12, height = 8)
@@ -254,17 +268,17 @@ for(n in 1:length(files))
   
   plot(p1)
   
-  p2 = ggplot() +
-    geom_point(data = data.frame(x), mapping = aes(x = centroid.1_mask, y = centroid.0_mask, 
-                                                   fill = intensity_gfp), 
-               shape = 21, size = 2) +
-    #scale_fill_viridis_c() + 
-    scale_fill_viridis_c(option = "magma") + 
-    theme_bw() + 
-    ggtitle('cells after size filtering')
-  
-  p1 + p2
-  
+  # p2 = ggplot() +
+  #   geom_point(data = data.frame(x), mapping = aes(x = centroid.1_mask, y = centroid.0_mask, 
+  #                                                  fill = intensity_gfp), 
+  #              shape = 21, size = 2) +
+  #   #scale_fill_viridis_c() + 
+  #   scale_fill_viridis_c(option = "magma") + 
+  #   theme_bw() + 
+  #   ggtitle('cells after size filtering')
+  # 
+  # p1 + p2
+  # 
   
   plot(x$intensity_prrx, log10(x$intensity_mean_dapi), cex = 0.2)
   #prrx_cutoff = crops$Prrx_intensity_cutoff[kk]
@@ -272,16 +286,16 @@ for(n in 1:length(files))
   abline(v = prrx_cutoff, col = 'red')
   abline(h = dapi_cutoff, col = 'red')
   
-  plot(x$intensity_gfp, x$intensity_prrx,  cex = 0.2)
-  #prrx_cutoff = crops$Prrx_intensity_cutoff[kk]
-  #dapi_cutoff = crops$Dapi_intensity_cutoff[kk]
-  abline(h = prrx_cutoff, col = 'red')
-  abline(h = dapi_cutoff, col = 'red')
+  # plot(x$intensity_gfp, x$intensity_prrx,  cex = 0.2)
+  # #prrx_cutoff = crops$Prrx_intensity_cutoff[kk]
+  # #dapi_cutoff = crops$Dapi_intensity_cutoff[kk]
+  # abline(h = prrx_cutoff, col = 'red')
+  # abline(h = dapi_cutoff, col = 'red')
   
   sels = which(x$intensity_prrx > prrx_cutoff & log10(x$intensity_mean_dapi) > dapi_cutoff)
-  sels = which(x$intensity_prrx > prrx_cutoff & 
-                 log10(x$intensity_mean_dapi) > 3.2 &
-                 x$intensity_gfp > 3.2)
+  # sels = which(x$intensity_prrx > prrx_cutoff & 
+  #                log10(x$intensity_mean_dapi) > 3.2 &
+  #                x$intensity_gfp > 3.2)
   cat(' nb of cells detected after Prxx and dapi filtering  :', length(sels), '\n')
   
   x = x[sels, ]
@@ -428,16 +442,17 @@ for(n in 1:length(files))
   
 }
 
-write.csv2(keep, file = paste0(outDir, 'image_hcrIntensity_gapProjection.csv'), 
-           sep = '\t', col.names = TRUE, row.names = FALSE)
+write.csv2(keep, file = paste0(outDir, 'image_hcrIntensity_gapProjection_all.csv'), 
+          row.names = FALSE)
 
 
-xx = keep
-keep = read.csv2(file = paste0(outDir, 'image_hcrIntensity_gapProjection.csv'), header = TRUE)
-
-keep = keep[which(keep$sample != "11dpi_LNP2_an2_20x"), ]
-
-keep = rbind(keep, xx)
+# xx = keep
+# 
+# keep = read.csv2(file = paste0(outDir, 'image_hcrIntensity_gapProjection.csv'), header = TRUE)
+# 
+# keep = keep[which(keep$sample != "11dpi_LNP2_an2_20x"), ]
+# 
+# keep = rbind(keep, xx)
 
 
 xx = keep[grep('_LNP2_|_LNP3_|_LNP4_', keep$sample), ]
